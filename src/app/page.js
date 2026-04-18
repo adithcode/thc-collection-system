@@ -721,14 +721,15 @@ function DashboardContent() {
                      CLEAR ALL REMARKS
                    </button>
                  )}
-                 <div style={{ height: '40px' }} />
-               </motion.div>
-             </>
-           )}
-         </AnimatePresence>
-       </div>
-     );
-   }
+              </div>
+              <div style={{ height: '40px' }} />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   return (
