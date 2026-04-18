@@ -30,6 +30,9 @@ function DashboardContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [filter, setFilter] = useState("All");
   const [selectedExec, setSelectedExec] = useState("ALL AGENTS");
+  const [collections, setCollections] = useState([]);
+  const [colFormData, setColFormData] = useState({ amount: "", mode: "Cash", ref: "" });
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -63,6 +66,18 @@ function DashboardContent() {
     if (session) {
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
       setProfile(prof);
+      const isMasterAdmin = prof?.role === 'admin' || prof?.username === 'pranprakash' || prof?.username === 'adithprakash';
+
+      // Fetch Collections for verification if Admin
+      if (isMasterAdmin) {
+        const { data: cols } = await supabase
+          .from('collections')
+          .select('*, customers(name, loan_no), profiles!agent_id(username, full_name_excel)')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false });
+        setCollections(cols || []);
+      }
+
       const { count } = await supabase.from('customers').select('*', { count: 'exact', head: true });
       setAllCount(count || 0);
 
@@ -107,6 +122,54 @@ function DashboardContent() {
       fetchHistory(selectedCustomer.id);
     }
     setIsSaving(false);
+  };
+
+  const handleLogCollection = async () => {
+    if (!colFormData.amount || parseFloat(colFormData.amount) <= 0) return;
+    setIsVerifying(true);
+    
+    const { error } = await supabase.from('collections').insert({
+      customer_id: selectedCustomer.id,
+      agent_id: profile.id,
+      amount: parseFloat(colFormData.amount),
+      payment_mode: colFormData.mode,
+      reference_no: colFormData.ref
+    });
+
+    if (!error) {
+      alert("Collection logged! Awaiting Admin verification.");
+      setColFormData({ amount: "", mode: "Cash", ref: "" });
+      setIsDetailOpen(false);
+    }
+    setIsVerifying(false);
+  };
+
+  const acceptCollection = async (col) => {
+    setIsVerifying(true);
+    // 1. Mark as verified
+    const { error: colErr } = await supabase.from('collections').update({
+      status: 'verified',
+      verified_by: profile.id
+    }).eq('id', col.id);
+
+    if (!colErr) {
+      // 2. Reduce Customer balances
+      const newTBC = (parseFloat(col.customers.month_tbc) || 0) - col.amount;
+      const newTotal = (parseFloat(col.customers.loan_amount) || 0) - col.amount;
+      
+      await supabase.from('customers').update({
+        month_tbc: newTBC,
+        loan_amount: newTotal
+      }).eq('id', col.customer_id);
+
+      fetchData();
+    }
+    setIsVerifying(false);
+  };
+
+  const rejectCollection = async (colId) => {
+    await supabase.from('collections').update({ status: 'rejected' }).eq('id', colId);
+    fetchData();
   };
 
   const updateInstallmentDay = async (newDay) => {
@@ -292,10 +355,70 @@ function DashboardContent() {
         >
           <Target size={12} /> DUE TODAY
         </button>
+
+        {isAdmin && (
+          <button 
+            onClick={() => setFilter('Verifications')} 
+            style={{ 
+              flex: 1, 
+              background: filter === 'Verifications' ? 'var(--warning)' : 'rgba(255,159,10,0.05)', 
+              color: filter === 'Verifications' ? '#000' : 'var(--warning)',
+              border: filter === 'Verifications' ? 'none' : '1px solid rgba(255,159,10,0.2)',
+              padding: '10px',
+              borderRadius: '10px',
+              fontSize: '11px',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+          >
+            <ShieldCheck size={12} /> PENDING ({collections.length})
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {displayCustomers.length > 0 ? (
+        {filter === 'Verifications' ? (
+           collections.length > 0 ? (
+             collections.map((col) => (
+               <div key={col.id} className="card" style={{ padding: '20px', borderLeft: '3px solid var(--warning)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                     <div>
+                        <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--warning)' }}>₹{col.amount.toLocaleString('en-IN')}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '4px' }}>{col.payment_mode} • {col.reference_no || 'No Ref'}</div>
+                     </div>
+                     <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: 700, fontSize: '12px' }}>{col.customers.name}</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-dim)' }}>Agent: {col.profiles.full_name_excel || col.profiles.username}</div>
+                     </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                     <button 
+                        disabled={isVerifying}
+                        onClick={() => acceptCollection(col)}
+                        style={{ flex: 2, background: 'var(--success)', color: '#000', border: 'none', padding: '10px', borderRadius: '8px', fontWeight: 800, fontSize: '11px' }}
+                     >
+                        ACCEPT RECEIPT
+                     </button>
+                     <button 
+                        disabled={isVerifying}
+                        onClick={() => rejectCollection(col.id)}
+                        style={{ flex: 1, background: 'rgba(255,59,48,0.1)', color: '#FF3B30', border: '1px solid rgba(255,59,48,0.2)', padding: '10px', borderRadius: '8px', fontWeight: 700, fontSize: '11px' }}
+                     >
+                        REJECT
+                     </button>
+                  </div>
+               </div>
+             ))
+           ) : (
+             <div style={{ padding: '60px 20px', textAlign: 'center', opacity: 0.5 }}>
+                <ShieldCheck size={40} style={{ margin: '0 auto 16px', color: 'var(--success)' }} />
+                <p style={{ fontSize: '14px' }}>All collections are verified! <br/>Your books are clean.</p>
+             </div>
+           )
+        ) : displayCustomers.length > 0 ? (
           displayCustomers.map((customer) => {
             const isDueToday = customer.installment_day === currentDayOfMonth;
             
@@ -422,6 +545,45 @@ function DashboardContent() {
                       onKeyDown={(e) => e.key === 'Enter' && handleSaveInteraction()}
                     />
                  </div>
+              </div>
+
+              <div style={{ marginBottom: '32px', padding: '20px', background: 'rgba(197,160,89,0.03)', borderRadius: '20px', border: '1px solid rgba(197,160,89,0.2)' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                    <Save size={14} style={{ color: 'var(--primary)' }} />
+                    <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>Log Collection (Money Received)</div>
+                 </div>
+                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                    <input 
+                      type="number" 
+                      placeholder="Amount (₹)" 
+                      value={colFormData.amount} 
+                      onChange={e => setColFormData({...colFormData, amount: e.target.value})}
+                      style={{ background: '#141415' }}
+                    />
+                    <select 
+                      value={colFormData.mode} 
+                      onChange={e => setColFormData({...colFormData, mode: e.target.value})}
+                      style={{ background: '#141415', color: '#FFF' }}
+                    >
+                      <option value="Cash">Cash</option>
+                      <option value="UPI">UPI</option>
+                      <option value="Bank">Bank Transfer</option>
+                    </select>
+                 </div>
+                 <input 
+                    placeholder="Reference No. (Optional)" 
+                    value={colFormData.ref} 
+                    onChange={e => setColFormData({...colFormData, ref: e.target.value})}
+                    style={{ background: '#141415', marginBottom: '12px' }}
+                 />
+                 <button 
+                  disabled={isVerifying}
+                  onClick={handleLogCollection}
+                  className="btn btn-primary" 
+                  style={{ width: '100%', padding: '12px', fontSize: '11px' }}
+                 >
+                   {isVerifying ? 'Logging...' : 'SUBMIT COLLECTION'}
+                 </button>
               </div>
 
               <div>
