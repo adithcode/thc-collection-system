@@ -38,6 +38,8 @@ function DashboardContent() {
     date: new Date().toISOString().split('T')[0] 
   });
   const [isVerifying, setIsVerifying] = useState(false);
+  const [verifiedHistory, setVerifiedHistory] = useState([]);
+  const [customerCollections, setCustomerCollections] = useState([]);
 
   useEffect(() => {
     fetchData();
@@ -73,14 +75,23 @@ function DashboardContent() {
       setProfile(prof);
       const isMasterAdmin = prof?.role === 'admin' || prof?.username === 'pranprakash' || prof?.username === 'adithprakash';
 
-      // Fetch Collections for verification if Admin
       if (isMasterAdmin) {
+        // Pending Queue
         const { data: cols } = await supabase
           .from('collections')
           .select('*, customers(name, loan_no), profiles!agent_id(username, full_name_excel)')
           .eq('status', 'pending')
           .order('created_at', { ascending: false });
         setCollections(cols || []);
+
+        // Master Ledger (Approved)
+        const { data: vh } = await supabase
+          .from('collections')
+          .select('*, customers(name, loan_no), profiles!agent_id(username, full_name_excel)')
+          .eq('status', 'verified')
+          .order('created_at', { ascending: false })
+          .limit(20);
+        setVerifiedHistory(vh || []);
       }
 
       const { count } = await supabase.from('customers').select('*', { count: 'exact', head: true });
@@ -100,14 +111,21 @@ function DashboardContent() {
     setLoading(false);
   }
 
-  const fetchHistory = async (custId) => {
-    const { data } = await supabase
+    const { data: interactions } = await supabase
       .from('interactions')
       .select('*, profiles(username, full_name_excel)')
       .eq('customer_id', custId)
       .order('created_at', { ascending: false })
       .limit(10);
-    setHistory(data || []);
+    setHistory(interactions || []);
+
+    const { data: pms } = await supabase
+      .from('collections')
+      .select('*, profiles!agent_id(username, full_name_excel)')
+      .eq('customer_id', custId)
+      .eq('status', 'verified')
+      .order('created_at', { ascending: false });
+    setCustomerCollections(pms || []);
   };
 
   const handleSaveInteraction = async (manualRemark = null) => {
@@ -407,6 +425,23 @@ function DashboardContent() {
                         REJECT
                      </button>
                   </div>
+                 <h3 style={{ fontSize: '11px', fontWeight: 800, color: 'var(--primary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Recently Verified Receipts</h3>
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                   {verifiedHistory.length > 0 ? verifiedHistory.map((col, i) => (
+                     <div key={i} style={{ padding: '14px', background: 'rgba(48, 209, 88, 0.03)', border: '1px solid rgba(48, 209, 88, 0.1)', borderRadius: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '13px' }}>{col.customers?.name}</div>
+                          <div style={{ fontSize: '9px', opacity: 0.6, marginTop: '2px' }}>Approved by {profile?.username} • {col.payment_mode}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontWeight: 900, color: 'var(--success)' }}>+₹{col.amount.toLocaleString('en-IN')}</div>
+                          <div style={{ fontSize: '8px', opacity: 0.5 }}>{new Date(col.created_at).toLocaleDateString()}</div>
+                        </div>
+                     </div>
+                   )) : (
+                     <div style={{ textAlign: 'center', padding: '20px', fontSize: '11px', color: 'var(--text-dim)', border: '1px dashed var(--border)', borderRadius: '12px' }}>No verified history yet</div>
+                   )}
+                 </div>
                </div>
              ))
            ) : (
@@ -502,33 +537,31 @@ function DashboardContent() {
                 </a>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '32px' }}>
-                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: '9px', color: 'var(--text-dim)', marginBottom: '4px', fontWeight: 700 }}>COLLECTION DAY</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Calendar size={14} className="gold-text" />
-                    <select 
-                      value={selectedCustomer.installment_day || ""} 
-                      onChange={(e) => updateInstallmentDay(e.target.value)}
-                      style={{ background: 'transparent', border: 'none', color: '#FFF', fontWeight: 800, fontSize: '16px', outline: 'none' }}
-                    >
-                      <option value="">Set Day</option>
-                      {Array.from({length: 31}, (_, i) => (
-                        <option key={i+1} value={i+1}>{i+1}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: '9px', color: 'var(--text-dim)', marginBottom: '4px', fontWeight: 700 }}>MONTHLY TBC</div>
-                  <div style={{ fontWeight: 800, fontSize: '18px' }} className="gold-text">
-                    ₹{(parseFloat(selectedCustomer.month_tbc) || 0).toLocaleString('en-IN')}
-                  </div>
-                </div>
-              </div>
-
               <div style={{ marginBottom: '32px' }}>
-                 <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '16px', textTransform: 'uppercase' }}>Log Call Interaction</div>
+                 <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '16px', textTransform: 'uppercase' }}>Total Audit Timeline</div>
+                 
+                 {/* Payments First (Financial Criticality) */}
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                    {customerCollections.map((c, i) => (
+                      <div key={`col-${i}`} style={{ padding: '12px', background: 'rgba(48, 209, 88, 0.05)', borderRadius: '12px', border: '1px solid rgba(48, 209, 88, 0.2)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ background: 'var(--success)', color: '#000', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Check size={10} />
+                              </div>
+                              <div style={{ fontSize: '13px', fontWeight: 900, color: 'var(--success)' }}>₹{c.amount.toLocaleString('en-IN')}</div>
+                           </div>
+                           <div style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 700 }}>VERIFIED RECEIPT</div>
+                        </div>
+                        <div style={{ fontSize: '10px', marginTop: '4px', opacity: 0.8 }}>
+                          Received via {c.payment_mode} • {new Date(c.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </div>
+                      </div>
+                    ))}
+                 </div>
+
+                 {/* Interaction status logs */}
+                 <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', opacity: 0.6 }}>CALL STATUS & REMARKS</div>
                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'none' }}>
                     {['Promised', 'Busy', 'Switch Off', 'Wrong No'].map((quickRemark) => (
                       <button 
