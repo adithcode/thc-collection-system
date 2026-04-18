@@ -82,7 +82,12 @@ function DashboardContent() {
   }
 
   const fetchHistory = async (custId) => {
-    const { data } = await supabase.from('interactions').select('*').eq('customer_id', custId).order('created_at', { ascending: false }).limit(5);
+    const { data } = await supabase
+      .from('interactions')
+      .select('*, profiles(username, full_name_excel)')
+      .eq('customer_id', custId)
+      .order('created_at', { ascending: false })
+      .limit(10);
     setHistory(data || []);
   };
 
@@ -427,9 +432,14 @@ function DashboardContent() {
                 {history.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {history.map((h, i) => (
-                      <div key={i} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', borderLeft: '2px solid var(--border)' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#FFF', marginBottom: '4px' }}>{h.remark}</div>
-                        <div style={{ fontSize: '9px', color: 'var(--text-dim)' }}>
+                      <div key={i} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', borderLeft: h.remark.includes('Promised') ? '2px solid var(--primary)' : '2px solid var(--border)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                           <div style={{ fontSize: '12px', fontWeight: 600, color: '#FFF' }}>{h.remark}</div>
+                           <div style={{ fontSize: '9px', color: 'var(--primary)', fontWeight: 800, textTransform: 'uppercase' }}>
+                              {h.profiles?.full_name_excel || h.profiles?.username || 'AGENT'}
+                           </div>
+                        </div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-dim)', opacity: 0.8 }}>
                           {new Date(h.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
