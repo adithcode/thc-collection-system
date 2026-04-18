@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
   Search, Plus, Filter, Phone, 
@@ -9,10 +9,11 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-export default function Dashboard() {
+function DashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [customers, setCustomers] = useState([]);
   const [allCount, setAllCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -32,7 +33,23 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+
+    // Handle home screen shortcut params
+    const initialFilter = searchParams.get('filter');
+    if (initialFilter) setFilter(initialFilter);
+
+    // Android Back Button Intelligence (History Trap)
+    const handlePopState = (e) => {
+      if (isDetailOpen) {
+        setIsDetailOpen(false);
+        // We stay on the page, don't let it navigate back to login or previous
+        window.history.pushState(null, "", window.location.pathname);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isDetailOpen, searchParams]);
 
   async function fetchData() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -258,13 +275,18 @@ export default function Dashboard() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {filteredCustomers.length > 0 ? (
-          filteredCustomers.map((customer) => {
+        {displayCustomers.length > 0 ? (
+          displayCustomers.map((customer) => {
             const isDueToday = customer.installment_day === currentDayOfMonth;
-            if (filter === 'Due Today' && !isDueToday) return null;
             
             return (
-              <div key={customer.id} className="card" onClick={() => { setSelectedCustomer(customer); setIsDetailOpen(true); fetchHistory(customer.id); }} 
+              <div key={customer.id} className="card" onClick={() => { 
+                setSelectedCustomer(customer); 
+                setIsDetailOpen(true); 
+                fetchHistory(customer.id);
+                // Push state for back-button handling
+                window.history.pushState({ detailOpen: true }, "");
+              }} 
                 style={{ 
                   padding: '16px', 
                   borderLeft: isDueToday ? '3px solid var(--primary)' : '1px solid var(--border)',
@@ -304,105 +326,118 @@ export default function Dashboard() {
       <AnimatePresence>
         {isDetailOpen && selectedCustomer && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="drawer-overlay" onClick={() => setIsDetailOpen(false)} />
-            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="drawer" style={{ height: '85vh', overflowY: 'auto' }}>
-              <div className="drawer-handle" />
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsDetailOpen(false)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', zIndex: 100 }}
+            />
+            <motion.div 
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--card-bg)', borderTop: '1px solid var(--border)', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', zIndex: 101, maxHeight: '92vh', overflowY: 'auto', padding: '24px' }}
+            >
+              <div style={{ width: '40px', height: '4px', background: 'var(--border)', borderRadius: '2px', margin: '0 auto 24px' }} />
               
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
-                 <div>
-                    <h2 style={{ fontSize: '22px' }}>{selectedCustomer.name}</h2>
-                    <p style={{ color: 'var(--primary)', fontSize: '12px', fontWeight: 800 }}>{selectedCustomer.loan_no}</p>
-                 </div>
-                 <a href={`tel:${selectedCustomer.phone}`} style={{ background: 'var(--success)', padding: '12px', borderRadius: '50%', color: '#000' }}><Phone size={20} fill="currentColor" /></a>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
+                <div>
+                  <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '4px' }}>{selectedCustomer.name}</h2>
+                  <p style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Database size={12} /> {selectedCustomer.loan_no}
+                  </p>
+                </div>
+                <a href={`tel:${selectedCustomer.phone}`} className="btn-icon" style={{ background: 'var(--primary)', color: '#000', padding: '12px', borderRadius: '14px' }}>
+                  <Phone size={20} />
+                </a>
               </div>
 
-              {/* Collection Day Grid (The 'Good Way') */}
-              <div style={{ marginBottom: '24px' }}>
-                 <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '12px', fontWeight: 800, letterSpacing: '0.1em' }}>SET COLLECTION DAY</div>
-                 <div className="hide-scrollbar" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px' }}>
-                    {[...Array(31)].map((_, i) => {
-                       const day = i + 1;
-                       const isSelected = selectedCustomer.installment_day === day;
-                       return (
-                          <motion.button
-                             key={day}
-                             whileTap={{ scale: 0.9 }}
-                             onClick={() => updateInstallmentDay(day)}
-                             style={{
-                                minWidth: '45px',
-                                height: '45px',
-                                borderRadius: '12px',
-                                background: isSelected ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
-                                color: isSelected ? '#000' : 'var(--text)',
-                                border: isSelected ? 'none' : '1px solid var(--border)',
-                                fontSize: '14px',
-                                fontWeight: 800,
-                                flexShrink: 0
-                             }}
-                          >
-                             {day}
-                          </motion.button>
-                       )
-                    })}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '32px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-dim)', marginBottom: '4px', fontWeight: 700 }}>COLLECTION DAY</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Calendar size={14} className="gold-text" />
+                    <select 
+                      value={selectedCustomer.installment_day || ""} 
+                      onChange={(e) => updateInstallmentDay(e.target.value)}
+                      style={{ background: 'transparent', border: 'none', color: '#FFF', fontWeight: 800, fontSize: '16px', outline: 'none' }}
+                    >
+                      <option value="">Set Day</option>
+                      {Array.from({length: 31}, (_, i) => (
+                        <option key={i+1} value={i+1}>{i+1}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-dim)', marginBottom: '4px', fontWeight: 700 }}>MONTHLY TBC</div>
+                  <div style={{ fontWeight: 800, fontSize: '18px' }} className="gold-text">
+                    ₹{(parseFloat(selectedCustomer.month_tbc) || 0).toLocaleString('en-IN')}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '32px' }}>
+                 <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '16px', textTransform: 'uppercase' }}>Log Call Interaction</div>
+                 <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'none' }}>
+                    {['Promised', 'Busy', 'Switch Off', 'Wrong No'].map((quickRemark) => (
+                      <button 
+                        key={quickRemark}
+                        onClick={() => handleSaveInteraction(quickRemark)}
+                        style={{ whiteSpace: 'nowrap', padding: '10px 16px', borderRadius: '10px', fontSize: '11px', fontWeight: 700, background: 'rgba(255,255,255,0.05)', color: '#FFF', border: '1px solid var(--border)' }}
+                      >
+                        {quickRemark}
+                      </button>
+                    ))}
+                 </div>
+                 <div style={{ position: 'relative', marginTop: '8px' }}>
+                    <MessageSquare size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-dim)' }} />
+                    <input 
+                      placeholder="Add custom remark..." 
+                      style={{ paddingLeft: '40px', background: '#141415' }}
+                      value={remark}
+                      onChange={(e) => setRemark(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveInteraction()}
+                    />
                  </div>
               </div>
 
-              {/* Quick Actions Toolbelt */}
-              <div style={{ marginBottom: '24px' }}>
-                 <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', letterSpacing: '0.1em' }}>QUICK LOG ACTIONS</div>
-                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <button onClick={() => handleSaveInteraction("🤝 PROMISED TO PAY")} className="btn btn-outline" style={{ border: '1px solid var(--success)', color: 'var(--success)', fontSize: '11px' }}>
-                       <Handshake size={14} /> PROMISED
-                    </button>
-                    <button onClick={() => handleSaveInteraction("📵 SWITCH OFF / NO RANGE")} className="btn btn-outline" style={{ border: '1px solid #FF453A', color: '#FF453A', fontSize: '11px' }}>
-                       <PhoneOff size={14} /> SWITCH OFF
-                    </button>
-                    <button onClick={() => handleSaveInteraction("⏳ BUSY / CALL BACK")} className="btn btn-outline" style={{ border: '1px solid var(--warning)', color: 'var(--warning)', fontSize: '11px' }}>
-                       <Clock size={14} /> BUSY
-                    </button>
-                    <button onClick={() => handleSaveInteraction("🚫 WRONG NUMBER")} className="btn btn-outline" style={{ border: '1px solid #8E8E93', color: '#8E8E93', fontSize: '11px' }}>
-                       <XCircle size={14} /> WRONG NO.
-                    </button>
-                 </div>
-              </div>
-
-              {/* Remarks & History */}
-              <div style={{ marginBottom: '24px' }}>
-                 <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <MessageSquare size={14} /> DETAILED REMARKS
-                 </div>
-                 <textarea value={remark} onChange={(e) => setRemark(e.target.value)} placeholder="Type custom notes here..." style={{ height: '80px', marginBottom: '12px' }} />
-                 <button className="btn btn-primary" onClick={() => handleSaveInteraction()} disabled={isSaving} style={{ width: '100%', padding: '16px' }}>
-                    {isSaving ? 'Saving...' : 'SUBMIT REMARK'}
-                 </button>
-              </div>
-
-              {/* History Timeline */}
               <div>
-                 <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <History size={14} /> PREVIOUS LOGS
-                 </div>
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {history.length > 0 ? history.map(h => (
-                      <div key={h.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px' }}>
-                         <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '4px' }}>{new Date(h.created_at).toLocaleString('en-IN')}</div>
-                         <div style={{ fontSize: '13px' }}>{h.remark}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <History size={14} style={{ color: 'var(--primary)' }} />
+                  <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Interaction History</div>
+                </div>
+                {history.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {history.map((h, i) => (
+                      <div key={i} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', borderLeft: '2px solid var(--border)' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#FFF', marginBottom: '4px' }}>{h.remark}</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-dim)' }}>
+                          {new Date(h.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </div>
                       </div>
-                    )) : (
-                      <div style={{ fontSize: '11px', color: 'var(--text-dim)', textAlign: 'center', padding: '20px' }}>No previous logs found.</div>
-                    )}
-                 </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ padding: '20px', textAlign: 'center', opacity: 0.4, fontSize: '11px' }}>No previous logs</div>
+                )}
               </div>
+
+              <div style={{ height: '40px' }} />
             </motion.div>
           </>
         )}
       </AnimatePresence>
-      
-      {/* Diagnostics Bar */}
-      <div style={{ position: 'fixed', bottom: '80px', left: '20px', right: '20px', background: 'rgba(20,20,21,0.95)', padding: '10px 16px', borderRadius: '12px', fontSize: '10px', color: 'var(--text-dim)', display: 'flex', justifyContent: 'space-between', border: '1px solid var(--border)', zIndex: 100, backdropFilter: 'blur(10px)' }}>
-        <div>POOL: <b style={{ color: '#FFF' }}>{allCount}</b> | IDENT: <b style={{ color: 'var(--primary)' }}>{profile?.username}</b></div>
-        <div style={{ color: '#FFF', fontWeight: 700 }}>{isAdmin ? "MASTER ADMIN CONTROL" : "AGENT SECURE"}</div>
-      </div>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>Loading Data Stream...</div>}>
+       <DashboardContent />
+    </Suspense>
   );
 }

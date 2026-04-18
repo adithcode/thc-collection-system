@@ -22,5 +22,21 @@ export default function manifest() {
         purpose: 'maskable'
       }
     ],
+    shortcuts: [
+      {
+        name: 'Due Today',
+        short_name: 'Due Today',
+        description: 'View cases due for collection today',
+        url: '/?filter=Due+Today',
+        icons: [{ src: '/icon-192.png', sizes: '192x192' }]
+      },
+      {
+        name: 'My Portfolio',
+        short_name: 'Portfolio',
+        description: 'View your full collection workload',
+        url: '/',
+        icons: [{ src: '/icon-192.png', sizes: '192x192' }]
+      }
+    ]
   }
 }
