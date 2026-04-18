@@ -168,8 +168,8 @@ export default function ImportPage() {
     rawRows.forEach(row => {
         const processed = processRow(row);
         if (processed && processed.loan_no) {
-            // Composite Identity for Multi-Loan Support
-            const compositeKey = `${processed.loan_no}_${processed.name}_${processed.loan_amount}`;
+            // Maximum Entropy Identity for Multi-Loan Support
+            const compositeKey = `${processed.loan_no}_${processed.name}_${processed.loan_amount}_${processed.due_date}_${processed.assigned_executive}`;
             loanNoCounts[compositeKey] = (loanNoCounts[compositeKey] || 0) + 1;
         }
     });
@@ -204,7 +204,7 @@ export default function ImportPage() {
         if (processed) finalData.push(processed);
       }
 
-      const { error } = await supabase.from('customers').upsert(finalData, { onConflict: ['loan_no', 'name', 'loan_amount'] });
+      const { error } = await supabase.from('customers').upsert(finalData, { onConflict: ['loan_no', 'name', 'loan_amount', 'due_date', 'assigned_executive'] });
       if (error) throw error;
 
       alert(`Successfully imported ${finalData.length} records! Initializing assignments.`);
