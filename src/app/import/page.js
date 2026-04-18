@@ -288,19 +288,25 @@ export default function ImportPage() {
             </p>
 
             <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', marginBottom: '24px', border: '1px solid var(--border)' }}>
-               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
                   <div>
-                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Spreadsheet Scope</div>
-                     <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px' }}>{preview.total} Rows</div>
+                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Rows in File</div>
+                     <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px' }}>{preview.total}</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Total Accounts</div>
+                     <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px', color: 'var(--primary)' }}>{preview.uniqueCount}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                     <div style={{ fontSize: '10px', fontWeight: 800, color: preview.total !== preview.uniqueCount ? 'var(--warning)' : 'var(--success)', textTransform: 'uppercase' }}>Unique Identifiers</div>
-                     <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px', color: preview.total !== preview.uniqueCount ? 'var(--warning)' : 'var(--success)' }}>{preview.uniqueCount} Records</div>
+                     <div style={{ fontSize: '10px', fontWeight: 800, color: preview.total !== preview.uniqueCount ? 'var(--warning)' : 'var(--success)', textTransform: 'uppercase' }}>Integrity</div>
+                     <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px', color: preview.total !== preview.uniqueCount ? 'var(--warning)' : 'var(--success)' }}>
+                        {preview.total === preview.uniqueCount ? 'PERFECT' : `${preview.total - preview.uniqueCount} MERGED`}
+                     </div>
                   </div>
                </div>
                {preview.duplicates.length > 0 && (
                   <div style={{ marginTop: '12px', padding: '8px', background: 'rgba(255,159,10,0.1)', borderRadius: '8px', color: 'var(--warning)', fontSize: '10px', fontWeight: 600 }}>
-                    ⚠️ WARNING: {preview.duplicates.length} Duplicate Loan IDs found. These records will be merged (overwritten). Check your mapping for 'Loan No'.
+                    ⚠️ WARNING: {preview.duplicates.length} Duplicate **Loan Numbers** found. (Names can be the same, but each Loan Number must be unique). Merged rows will show the latest data.
                   </div>
                )}
             </div>
