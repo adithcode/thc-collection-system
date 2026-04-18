@@ -82,7 +82,6 @@ function DashboardContent() {
       setAllCount(count || 0);
 
       let query = supabase.from('customers').select('*');
-      const isMasterAdmin = prof?.role === 'admin' || prof?.username === 'pranprakash' || prof?.username === 'adithprakash';
 
       if (!isMasterAdmin) {
          const myIdentity = prof?.full_name_excel || prof?.username || "SECURE_LOCK";
