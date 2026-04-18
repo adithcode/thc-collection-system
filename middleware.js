@@ -9,6 +9,6 @@ export const config = {
     /*
      * Match all request paths except static assets and PWA files
      */
-    '/((?!_next/static|_next/image|favicon.ico|api|manifest|sw|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp|webmanifest|js)$).*)',
   ],
 }
