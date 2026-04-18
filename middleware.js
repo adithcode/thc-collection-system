@@ -7,8 +7,8 @@ export async function middleware(request) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except static assets
+     * Match all request paths except static assets and PWA files
      */
-    '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api|manifest|sw|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
