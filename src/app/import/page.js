@@ -142,14 +142,15 @@ export default function ImportPage() {
     if (entry.loan_no) entry.loan_no = entry.loan_no.toString().trim();
     if (entry.name) entry.name = entry.name.trim();
 
-    if (entry.name && (entry.name.toLowerCase().includes('customer name') || entry.name.toLowerCase() === 'customer')) return null;
-    if (entry.loan_no && entry.loan_no.toLowerCase().includes('loan no')) return null;
+    if (entry.name && (entry.name.toLowerCase().includes('customer name') || entry.name.toLowerCase() === 'customer')) return { skip: 'header' };
+    if (entry.loan_no && entry.loan_no.toLowerCase().includes('loan no')) return { skip: 'header' };
 
     if (!entry.month_tbc || entry.month_tbc === 0) {
         entry.month_tbc = entry.loan_amount || 0;
     }
 
-    if (entry.month_tbc === 0 && entry.loan_amount === 0) return null;
+    // Relaxed inclusion: if a name exists, we import it even if balance is 0
+    if (!entry.name || entry.name.length < 2) return { skip: 'empty' };
 
     if (!entry.installment_day && entry.due_date) {
         entry.installment_day = new Date(entry.due_date).getDate();
@@ -164,18 +165,32 @@ export default function ImportPage() {
     const validMapped = [];
 
     // Ultimate Separation: Treat every row as a new unique entity
+    let imported = 0;
+    let skippedHeader = 0;
+    let skippedEmpty = 0;
+
     rawRows.forEach((row, idx) => {
         const processed = processRow(row);
         if (processed) {
-            validMapped.push(processed);
+            if (processed.skip === 'header') {
+                skippedHeader++;
+            } else if (processed.skip === 'empty') {
+                skippedEmpty++;
+            } else {
+                validMapped.push(processed);
+                imported++;
+            }
         }
     });
 
     setPreview({
         rows: validMapped.slice(0, 5),
         total: rawRows.length,
-        uniqueCount: rawRows.length, // Matching 1:1 always
-        duplicates: [] // No more merging logic
+        imported: imported,
+        skippedHeader: skippedHeader,
+        skippedEmpty: skippedEmpty,
+        uniqueCount: imported,
+        duplicates: []
     });
     setStep(3);
   };
@@ -184,21 +199,24 @@ export default function ImportPage() {
     setIsImporting(true);
     try {
       const finalData = [];
+      let skipped = 0;
+
       file.slice(1).forEach((row) => {
         const processed = processRow(row);
-        if (processed) {
-            // Force separate identity always
+        if (processed && !processed.skip) {
             if (typeof window !== 'undefined') {
               processed.id = crypto.randomUUID();
             }
             finalData.push(processed);
+        } else {
+            skipped++;
         }
       });
 
       const { error } = await supabase.from('customers').insert(finalData);
       if (error) throw error;
 
-      alert(`Successfully imported ${finalData.length} records! Initializing assignments.`);
+      alert(`Sync Complete!\nImported: ${finalData.length} Records\nSkipped: ${skipped} (Blank/Header rows)\nTotal Rows in File: ${file.length - 1}`);
       window.location.href = "/";
     } catch (err) {
       console.error(err);
@@ -304,30 +322,20 @@ export default function ImportPage() {
                      <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px' }}>{preview.total}</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Total Accounts</div>
-                     <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px', color: 'var(--primary)' }}>{preview.uniqueCount}</div>
+                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>Valid Records</div>
+                     <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px', color: 'var(--primary)' }}>{preview.imported}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                     <div style={{ fontSize: '10px', fontWeight: 800, color: preview.total !== preview.uniqueCount ? 'var(--warning)' : 'var(--success)', textTransform: 'uppercase' }}>Integrity</div>
-                     <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px', color: preview.total !== preview.uniqueCount ? 'var(--warning)' : 'var(--success)' }}>
-                        {preview.total === preview.uniqueCount ? 'PERFECT' : `${preview.total - preview.uniqueCount} MERGED`}
+                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--warning)', textTransform: 'uppercase' }}>Skipped</div>
+                     <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px', color: 'var(--warning)' }}>
+                        {preview.skippedEmpty + preview.skippedHeader}
                      </div>
                   </div>
                </div>
-               {preview.duplicates.length > 0 && (
-                  <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(255,159,10,0.05)', borderRadius: '12px', border: '1px solid rgba(255,159,10,0.2)' }}>
-                    <div style={{ color: 'var(--warning)', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', marginBottom: '8px' }}>
-                       ⚠️ Potential Overwrites Detected ({preview.duplicates.length} accounts)
-                    </div>
-                    <div style={{ maxHeight: '60px', overflowY: 'auto', fontSize: '9px', opacity: 0.8 }}>
-                       {preview.duplicates.slice(0, 3).map((d, idx) => (
-                          <div key={idx} style={{ marginBottom: '4px' }}>• {d.name} (₹{d.amount})</div>
-                       ))}
-                       {preview.duplicates.length > 3 && <div>...and {preview.duplicates.length - 3} more</div>}
-                    </div>
-                    <p style={{ fontSize: '9px', marginTop: '8px', opacity: 0.6 }}>
-                       The system will merge these identical rows. If they should be separate, check your mappings.
-                    </p>
+               
+               {(preview.skippedEmpty > 0 || preview.skippedHeader > 0) && (
+                  <div style={{ marginTop: '12px', padding: '8px', background: 'rgba(255,159,10,0.05)', borderRadius: '8px', color: 'rgba(255,159,10,0.8)', fontSize: '9px', fontWeight: 600 }}>
+                    ℹ️ Information: {preview.skippedHeader} Header rows and {preview.skippedEmpty} Empty/Invalid rows were automatically filtered to protect port purity.
                   </div>
                )}
             </div>
