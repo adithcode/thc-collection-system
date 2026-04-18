@@ -31,7 +31,12 @@ function DashboardContent() {
   const [filter, setFilter] = useState("All");
   const [selectedExec, setSelectedExec] = useState("ALL AGENTS");
   const [collections, setCollections] = useState([]);
-  const [colFormData, setColFormData] = useState({ amount: "", mode: "Cash", ref: "" });
+  const [colFormData, setColFormData] = useState({ 
+    amount: "", 
+    mode: "Cash", 
+    ref: "", 
+    date: new Date().toISOString().split('T')[0] 
+  });
   const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
@@ -132,12 +137,18 @@ function DashboardContent() {
       agent_id: profile.id,
       amount: parseFloat(colFormData.amount),
       payment_mode: colFormData.mode,
-      reference_no: colFormData.ref
+      reference_no: colFormData.ref,
+      created_at: new Date(colFormData.date).toISOString()
     });
 
     if (!error) {
       alert("Collection logged! Awaiting Admin verification.");
-      setColFormData({ amount: "", mode: "Cash", ref: "" });
+      setColFormData({ 
+        amount: "", 
+        mode: "Cash", 
+        ref: "", 
+        date: new Date().toISOString().split('T')[0] 
+      });
       setIsDetailOpen(false);
     }
     setIsVerifying(false);
@@ -203,55 +214,42 @@ function DashboardContent() {
 
   return (
     <div className="container safe-bottom">
-      <div style={{ padding: '32px 0 20px', position: 'relative' }}>
-        <div style={{ position: 'absolute', top: '32px', right: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button 
-            onClick={() => fetchData()}
-            className="btn-icon"
-            style={{ background: 'rgba(197,160,89,0.1)', color: 'var(--primary)', padding: '8px', borderRadius: '10px' }}
-          >
-            <motion.div
-              animate={{ rotate: loading ? 360 : 0 }}
-              transition={{ repeat: loading ? Infinity : 0, duration: 1, ease: "linear" }}
-              style={{ display: 'flex' }}
-            >
-              <RefreshCw size={16} />
-            </motion.div>
-          </button>
-
-          <button 
-            onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
-            className="btn-icon"
-            style={{ background: 'rgba(255,59,48,0.1)', color: '#FF3B30', padding: '8px', borderRadius: '10px' }}
-          >
-            <LogOut size={16} />
-          </button>
-          
-          <div style={{ 
-              background: isAdmin ? 'var(--primary)' : 'rgba(255,255,255,0.05)', 
-              color: isAdmin ? '#000' : 'var(--text-dim)',
-              padding: '4px 10px',
-              borderRadius: '20px',
-              fontSize: '9px',
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              border: isAdmin ? 'none' : '1px solid var(--border)'
-          }}>
-             {isAdmin ? <ShieldCheck size={10} /> : <UserIcon size={10} />}
-             {isAdmin ? 'MASTER ADMIN' : 'RESTRICTED AGENT'}
-          </div>
+      <div style={{ padding: '24px 0', borderBottom: '1px solid var(--border)', marginBottom: '32px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+           <div>
+              <h1 style={{ fontSize: '20px', fontWeight: 900, letterSpacing: '-0.02em', color: '#FFF' }}>
+                THC <span className="gold-text">GROUP</span>
+              </h1>
+              <p style={{ fontSize: '10px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>
+                 {formattedDate} • {profile?.username}
+              </p>
+           </div>
+           
+           <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                onClick={() => fetchData()}
+                className="btn-icon"
+                style={{ background: 'rgba(197,160,89,0.1)', color: 'var(--primary)', padding: '10px', borderRadius: '12px' }}
+              >
+                <motion.div
+                  animate={{ rotate: loading ? 360 : 0 }}
+                  transition={{ repeat: loading ? Infinity : 0, duration: 1, ease: "linear" }}
+                  style={{ display: 'flex' }}
+                >
+                  <RefreshCw size={18} />
+                </motion.div>
+              </button>
+              <button 
+                onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
+                className="btn-icon"
+                style={{ background: 'rgba(255,59,48,0.1)', color: '#FF3B30', padding: '10px', borderRadius: '12px' }}
+              >
+                <LogOut size={18} />
+              </button>
+           </div>
         </div>
-        
-        <p style={{ color: 'var(--primary)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em' }}>
-          {formattedDate}
-        </p>
-        <p style={{ color: 'var(--text-dim)', fontSize: '10px', marginTop: '2px', opacity: 0.7 }}>
-          Active Session: {profile?.username}
-        </p>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '24px' }}>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
           <div>
             <div className="gold-text" style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>
               ₹{totalMonthlyTBC.toLocaleString('en-IN')}
@@ -491,7 +489,15 @@ function DashboardContent() {
                     <Database size={12} /> {selectedCustomer.loan_no}
                   </p>
                 </div>
-                <a href={`tel:${selectedCustomer.phone.replace(/[^0-9+]/g, '')}`} className="btn-icon" style={{ background: 'var(--primary)', color: '#000', padding: '12px', borderRadius: '14px' }}>
+                <a 
+                  href={`tel:${selectedCustomer.phone.replace(/[^0-9+]/g, '')}`} 
+                  onClick={(e) => {
+                    // Force dialer open if standard link is ignored
+                    window.location.href = `tel:${selectedCustomer.phone.replace(/[^0-9+]/g, '')}`;
+                  }}
+                  className="btn-icon" 
+                  style={{ background: 'var(--primary)', color: '#000', padding: '12px', borderRadius: '14px' }}
+                >
                   <Phone size={20} />
                 </a>
               </div>
@@ -568,6 +574,15 @@ function DashboardContent() {
                       <option value="UPI">UPI</option>
                       <option value="Bank">Bank Transfer</option>
                     </select>
+                 </div>
+                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '9px', color: 'var(--text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>Payment Date</div>
+                    <input 
+                      type="date" 
+                      value={colFormData.date} 
+                      onChange={e => setColFormData({...colFormData, date: e.target.value})}
+                      style={{ background: '#141415' }}
+                    />
                  </div>
                  <input 
                     placeholder="Reference No. (Optional)" 
