@@ -96,17 +96,74 @@ export default function ImportPage() {
     reader.readAsBinaryString(file);
   };
 
-  const generatePreview = () => {
-    const dataRows = file.slice(1).filter(row => row[headers.indexOf(mapping.name)]);
-    const mappedData = dataRows.slice(0, 5).map(row => {
-      const entry = {};
-      FIELD_DEFINITIONS.forEach(f => {
-        const headerIndex = headers.indexOf(mapping[f.key]);
-        entry[f.key] = row[headerIndex] || "—";
-      });
-      return entry;
+  const processRow = (row) => {
+    const entry = {};
+    if (!row[headers.indexOf(mapping.name)]) return null;
+
+    FIELD_DEFINITIONS.forEach(f => {
+      const headerIndex = headers.indexOf(mapping[f.key]);
+      let val = row[headerIndex];
+      
+      if (['loan_amount', 'month_tbc'].includes(f.key)) {
+        // Hardened Numeric Extraction
+        if (val !== null && val !== undefined) {
+          const strVal = val.toString().replace(/[^0-9.]/g, '');
+          val = strVal ? Number(strVal) : 0;
+        } else {
+          val = 0;
+        }
+        if (isNaN(val)) val = 0;
+      }
+      
+      if (f.key === 'due_date' || f.key === 'installment_day') {
+        if (typeof val === 'number') {
+            const date = new Date((val - 25569) * 86400 * 1000);
+            if (f.key === 'installment_day') val = date.getDate();
+            else val = date.toISOString().split('T')[0];
+        } else if (typeof val === 'string' && val.includes('-')) {
+            const parts = val.split('-');
+            if (parts.length === 3) {
+                const [d, m, y] = parts;
+                if (f.key === 'installment_day') val = parseInt(d);
+                else val = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+            }
+        }
+      }
+      entry[f.key] = val ?? null;
     });
-    setPreview(mappedData);
+
+    // Sanitize
+    if (entry.loan_no) entry.loan_no = entry.loan_no.toString().trim();
+    if (entry.name) entry.name = entry.name.trim();
+
+    // Smart Target Fallback
+    if (!entry.month_tbc || entry.month_tbc === 0) {
+        entry.month_tbc = entry.loan_amount || 0;
+    }
+
+    // Zero-Value Gate
+    if (entry.month_tbc === 0 && entry.loan_amount === 0) return null;
+
+    // Smart Day Calculation
+    if (!entry.installment_day && entry.due_date) {
+        entry.installment_day = new Date(entry.due_date).getDate();
+    }
+
+    entry.phone = entry.phone || 'NA';
+    return entry;
+  };
+
+  const generatePreview = () => {
+    const rawRows = file.slice(1);
+    const validMapped = [];
+    
+    for (const row of rawRows) {
+        const processed = processRow(row);
+        if (processed) validMapped.push(processed);
+        if (validMapped.length >= 5) break;
+    }
+    
+    setPreview(validMapped);
     setStep(3);
   };
 
@@ -117,69 +174,8 @@ export default function ImportPage() {
       const finalData = [];
 
       for (const row of dataRows) {
-        const entry = {};
-        if (!row[headers.indexOf(mapping.name)]) continue;
-
-        FIELD_DEFINITIONS.forEach(f => {
-          const headerIndex = headers.indexOf(mapping[f.key]);
-          let val = row[headerIndex];
-          
-          if (['loan_amount', 'month_tbc'].includes(f.key)) {
-            // Hardened Numeric Extraction
-            if (val !== null && val !== undefined) {
-              const strVal = val.toString().replace(/[^0-9.]/g, '');
-              val = strVal ? Number(strVal) : 0;
-            } else {
-              val = 0;
-            }
-            if (isNaN(val)) val = 0;
-          }
-          
-          if (f.key === 'due_date' || f.key === 'installment_day') {
-            if (typeof val === 'number') {
-                // Handle Excel Serial Dates
-                const date = new Date((val - 25569) * 86400 * 1000);
-                if (f.key === 'installment_day') {
-                    val = date.getDate();
-                } else {
-                    val = date.toISOString().split('T')[0];
-                }
-            } else if (typeof val === 'string' && val.includes('-')) {
-                // Handle string dates like DD-MM-YYYY
-                const parts = val.split('-');
-                if (parts.length === 3) {
-                    const [d, m, y] = parts;
-                    if (f.key === 'installment_day') {
-                        val = parseInt(d);
-                    } else {
-                        // Reformat as YYYY-MM-DD
-                        val = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-                    }
-                }
-            }
-          }
-
-          entry[f.key] = val ?? null;
-        });
-
-        // Sanitize identifiers
-        if (entry.loan_no) entry.loan_no = entry.loan_no.toString().trim();
-        if (entry.name) entry.name = entry.name.trim();
-
-        // Smart Target Fallback: If Monthly Target is 0/empty, use Total Due
-        if (!entry.month_tbc || parseFloat(entry.month_tbc) === 0) {
-            entry.month_tbc = entry.loan_amount || 0;
-        }
-
-        // Zero-Value Safety Gate: Skip ghost rows from Excel (if both are truly 0)
-        if (entry.month_tbc === 0 && entry.loan_amount === 0) continue;
-
-        // Smart Day Calculation Logic (User Requirement)
-        if (!entry.installment_day && entry.due_date) {
-            entry.installment_day = new Date(entry.due_date).getDate();
-        }
-
-        finalData.push(entry);
+        const processed = processRow(row);
+        if (processed) finalData.push(processed);
       }
 
       const { error } = await supabase.from('customers').upsert(finalData, { onConflict: 'loan_no' });
