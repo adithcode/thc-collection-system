@@ -369,7 +369,7 @@ function DashboardContent() {
                     <Database size={12} /> {selectedCustomer.loan_no}
                   </p>
                 </div>
-                <a href={`tel:${selectedCustomer.phone}`} className="btn-icon" style={{ background: 'var(--primary)', color: '#000', padding: '12px', borderRadius: '14px' }}>
+                <a href={`tel:${selectedCustomer.phone.replace(/[^0-9+]/g, '')}`} className="btn-icon" style={{ background: 'var(--primary)', color: '#000', padding: '12px', borderRadius: '14px' }}>
                   <Phone size={20} />
                 </a>
               </div>
