@@ -160,7 +160,12 @@ export default function ImportPage() {
         if (entry.loan_no) entry.loan_no = entry.loan_no.toString().trim();
         if (entry.name) entry.name = entry.name.trim();
 
-        // Zero-Value Safety Gate: Skip ghost rows from Excel
+        // Smart Target Fallback: If Monthly Target is 0/empty, use Total Due
+        if (!entry.month_tbc || parseFloat(entry.month_tbc) === 0) {
+            entry.month_tbc = entry.loan_amount || 0;
+        }
+
+        // Zero-Value Safety Gate: Skip ghost rows from Excel (if both are truly 0)
         if (entry.month_tbc === 0 && entry.loan_amount === 0) continue;
 
         // Smart Day Calculation Logic (User Requirement)
