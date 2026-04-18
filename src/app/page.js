@@ -146,6 +146,12 @@ function DashboardContent() {
     setIsSaving(false);
   };
 
+  const handleClearHistory = async () => {
+    if (!confirm("Are you sure you want to permanently delete all interaction history for this customer? (Payment history will NOT be deleted)")) return;
+    const { error } = await supabase.from('interactions').delete().eq('customer_id', selectedCustomer.id);
+    if (!error) fetchHistory(selectedCustomer.id);
+  };
+
   const handleLogCollection = async () => {
     if (!colFormData.amount || parseFloat(colFormData.amount) <= 0) return;
     setIsVerifying(true);
@@ -425,23 +431,6 @@ function DashboardContent() {
                         REJECT
                      </button>
                   </div>
-                 <h3 style={{ fontSize: '11px', fontWeight: 800, color: 'var(--primary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Recently Verified Receipts</h3>
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                   {verifiedHistory.length > 0 ? verifiedHistory.map((col, i) => (
-                     <div key={i} style={{ padding: '14px', background: 'rgba(48, 209, 88, 0.03)', border: '1px solid rgba(48, 209, 88, 0.1)', borderRadius: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '13px' }}>{col.customers?.name}</div>
-                          <div style={{ fontSize: '9px', opacity: 0.6, marginTop: '2px' }}>Approved by {profile?.username} • {col.payment_mode}</div>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontWeight: 900, color: 'var(--success)' }}>+₹{col.amount.toLocaleString('en-IN')}</div>
-                          <div style={{ fontSize: '8px', opacity: 0.5 }}>{new Date(col.created_at).toLocaleDateString()}</div>
-                        </div>
-                     </div>
-                   )) : (
-                     <div style={{ textAlign: 'center', padding: '20px', fontSize: '11px', color: 'var(--text-dim)', border: '1px dashed var(--border)', borderRadius: '12px' }}>No verified history yet</div>
-                   )}
-                 </div>
                </div>
              ))
            ) : (
@@ -657,6 +646,14 @@ function DashboardContent() {
                 ) : (
                   <div style={{ padding: '20px', textAlign: 'center', opacity: 0.4, fontSize: '11px' }}>No previous logs</div>
                 )}
+                {history.length > 0 && (
+                   <button 
+                    onClick={handleClearHistory}
+                    style={{ marginTop: '16px', background: 'transparent', border: '1px solid rgba(255,59,48,0.2)', color: '#FF3B30', fontSize: '10px', fontWeight: 700, padding: '8px 12px', borderRadius: '8px', width: '100%', opacity: 0.6 }}
+                   >
+                     CLEAR ALL REMARKS
+                   </button>
+                 )}
               </div>
 
               <div style={{ height: '40px' }} />
@@ -664,6 +661,28 @@ function DashboardContent() {
           </>
         )}
       </AnimatePresence>
+       {isAdmin && verifiedHistory.length > 0 && filter !== 'Verifications' && (
+          <div style={{ marginTop: '32px', borderTop: '1px solid var(--border)', paddingTop: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+               <ShieldCheck size={14} style={{ color: 'var(--success)' }} />
+               <h3 style={{ fontSize: '11px', fontWeight: 800, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Confirmed Ledger (Last 20)</h3>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {verifiedHistory.map((col, i) => (
+                <div key={i} style={{ padding: '14px', background: 'rgba(48, 209, 88, 0.03)', border: '1px solid rgba(48, 209, 88, 0.1)', borderRadius: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '13px' }}>{col.customers?.name}</div>
+                      <div style={{ fontSize: '9px', opacity: 0.6, marginTop: '2px' }}>{col.payment_mode} • Approved by {col.profiles?.username}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 900, color: 'var(--success)' }}>+₹{col.amount.toLocaleString('en-IN')}</div>
+                      <div style={{ fontSize: '8px', opacity: 0.5 }}>{new Date(col.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
+                    </div>
+                </div>
+              ))}
+            </div>
+          </div>
+       )}
     </div>
   );
 }
