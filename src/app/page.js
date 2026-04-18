@@ -398,6 +398,28 @@ function DashboardContent() {
             <ShieldCheck size={12} /> PENDING ({collections.length})
           </button>
         )}
+
+        {isAdmin && (
+          <button 
+            onClick={() => setFilter('Ledger')} 
+            style={{ 
+              flex: 1, 
+              background: filter === 'Ledger' ? 'var(--success)' : 'rgba(48, 209, 88, 0.05)', 
+              color: filter === 'Ledger' ? '#000' : 'var(--success)',
+              border: filter === 'Ledger' ? 'none' : '1px solid rgba(48, 209, 88, 0.2)',
+              padding: '10px',
+              borderRadius: '10px',
+              fontSize: '11px',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+          >
+            <History size={12} /> LEDGER
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -437,6 +459,33 @@ function DashboardContent() {
              <div style={{ padding: '60px 20px', textAlign: 'center', opacity: 0.5 }}>
                 <ShieldCheck size={40} style={{ margin: '0 auto 16px', color: 'var(--success)' }} />
                 <p style={{ fontSize: '14px' }}>All collections are verified! <br/>Your books are clean.</p>
+             </div>
+           )
+        ) : filter === 'Ledger' ? (
+           verifiedHistory.length > 0 ? (
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+               <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--success)', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>Confirmed Audit Ledger (Last 20)</div>
+               {verifiedHistory.map((col, i) => (
+                 <div key={i} className="card" style={{ padding: '16px', borderLeft: '3px solid var(--success)' }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                         <div style={{ fontWeight: 800, fontSize: '14px', color: '#FFF' }}>{col.customers?.name}</div>
+                         <div style={{ fontSize: '9px', color: 'var(--text-dim)', marginTop: '4px' }}>
+                           {col.payment_mode} • Confirmed by {col.profiles?.username}
+                         </div>
+                       </div>
+                       <div style={{ textAlign: 'right' }}>
+                         <div style={{ fontWeight: 900, color: 'var(--success)', fontSize: '15px' }}>₹{col.amount.toLocaleString('en-IN')}</div>
+                         <div style={{ fontSize: '8px', opacity: 0.6 }}>{new Date(col.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
+                       </div>
+                     </div>
+                 </div>
+               ))}
+             </div>
+           ) : (
+             <div style={{ padding: '60px 20px', textAlign: 'center', opacity: 0.5 }}>
+                <History size={40} style={{ margin: '0 auto 16px' }} />
+                <p style={{ fontSize: '14px' }}>Audit Ledger is currently empty.</p>
              </div>
            )
         ) : displayCustomers.length > 0 ? (
@@ -672,72 +721,11 @@ function DashboardContent() {
                      CLEAR ALL REMARKS
                    </button>
                  )}
-              </div>
-
-                 <div style={{ height: '160px' }} />
-
-               {/* STICKY FIELD ACTION BAR */}
-               <div style={{ 
-                 position: 'fixed', 
-                 bottom: 0, 
-                 left: 0, 
-                 right: 0, 
-                 padding: '24px 20px calc(24px + env(safe-area-inset-bottom, 0px))', 
-                 background: 'rgba(20, 20, 21, 0.85)', 
-                 backdropFilter: 'blur(24px)', 
-                 WebkitBackdropFilter: 'blur(24px)',
-                 borderTop: '1px solid var(--border)',
-                 zIndex: 110,
-                 display: 'flex',
-                 gap: '12px'
-               }}>
-                  <button 
-                    onClick={() => {
-                      const phone = selectedCustomer.phone?.replace(/[^0-9+]/g, '');
-                      if (phone) window.location.href = `tel:${phone}`;
-                      else alert("No valid phone number assigned.");
-                    }}
-                    style={{ flex: 1, background: 'rgba(197,160,89,0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '16px', borderRadius: '16px', fontWeight: 800, fontSize: '13px' }}
-                  >
-                    <Phone size={18} /> CALL
-                  </button>
-                  <button 
-                    onClick={() => {
-                       const form = document.getElementById('log-collection-form');
-                       if (form) form.scrollIntoView({ behavior: 'smooth' });
-                       else alert("Collection form is loading...");
-                    }}
-                    style={{ flex: 2, background: 'var(--primary)', color: '#000', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '16px', borderRadius: '16px', fontWeight: 900, fontSize: '14px', boxShadow: '0 8px 30px rgba(197,160,89,0.3)' }}
-                  >
-                    <Save size={18} /> LOG COLLECTION
-                  </button>
-               </div>
+                 <div style={{ height: '40px' }} />
             </motion.div>
           </>
         )}
       </AnimatePresence>
-       {isAdmin && verifiedHistory.length > 0 && filter !== 'Verifications' && (
-          <div style={{ marginTop: '32px', borderTop: '1px solid var(--border)', paddingTop: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-               <ShieldCheck size={14} style={{ color: 'var(--success)' }} />
-               <h3 style={{ fontSize: '11px', fontWeight: 800, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Confirmed Ledger (Last 20)</h3>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {verifiedHistory.map((col, i) => (
-                <div key={i} style={{ padding: '14px', background: 'rgba(48, 209, 88, 0.03)', border: '1px solid rgba(48, 209, 88, 0.1)', borderRadius: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '13px' }}>{col.customers?.name}</div>
-                      <div style={{ fontSize: '9px', opacity: 0.6, marginTop: '2px' }}>{col.payment_mode} • Approved by {col.profiles?.username}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 900, color: 'var(--success)' }}>+₹{col.amount.toLocaleString('en-IN')}</div>
-                      <div style={{ fontSize: '8px', opacity: 0.5 }}>{new Date(col.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
-                    </div>
-                </div>
-              ))}
-            </div>
-          </div>
-       )}
     </div>
   );
 }
