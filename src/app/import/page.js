@@ -13,6 +13,8 @@ export default function ImportPage() {
   const [file, setFile] = useState(null);
   const [headers, setHeaders] = useState([]);
   const [mapping, setMapping] = useState({});
+  const [progress, setProgress] = useState(0);
+  const [dbCount, setDbCount] = useState(null);
   const [preview, setPreview] = useState([]);
   const [step, setStep] = useState(1);
   const [isImporting, setIsImporting] = useState(false);
@@ -20,7 +22,13 @@ export default function ImportPage() {
 
   useEffect(() => {
     checkAdmin();
+    fetchStatus();
   }, []);
+
+  const fetchStatus = async () => {
+    const { count } = await supabase.from('customers').select('*', { count: 'exact', head: true });
+    setDbCount(count || 0);
+  };
 
   const checkAdmin = async () => {
     setIsCheckingAuth(true);
@@ -105,7 +113,6 @@ export default function ImportPage() {
       let val = row[headerIndex];
       
       if (['loan_amount', 'month_tbc'].includes(f.key)) {
-        // Hardened Numeric Extraction
         if (val !== null && val !== undefined) {
           const strVal = val.toString().replace(/[^0-9.]/g, '');
           val = strVal ? Number(strVal) : 0;
@@ -132,19 +139,18 @@ export default function ImportPage() {
       entry[f.key] = val ?? null;
     });
 
-    // Sanitize
     if (entry.loan_no) entry.loan_no = entry.loan_no.toString().trim();
     if (entry.name) entry.name = entry.name.trim();
 
-    // Smart Target Fallback
+    if (entry.name && (entry.name.toLowerCase().includes('customer name') || entry.name.toLowerCase() === 'customer')) return null;
+    if (entry.loan_no && entry.loan_no.toLowerCase().includes('loan no')) return null;
+
     if (!entry.month_tbc || entry.month_tbc === 0) {
         entry.month_tbc = entry.loan_amount || 0;
     }
 
-    // Zero-Value Gate
     if (entry.month_tbc === 0 && entry.loan_amount === 0) return null;
 
-    // Smart Day Calculation
     if (!entry.installment_day && entry.due_date) {
         entry.installment_day = new Date(entry.due_date).getDate();
     }
@@ -159,7 +165,6 @@ export default function ImportPage() {
     const loanNoCounts = {};
     const duplicates = [];
 
-    // Analyze full file for integrity
     rawRows.forEach(row => {
         const processed = processRow(row);
         if (processed && processed.loan_no) {
@@ -171,7 +176,6 @@ export default function ImportPage() {
         if (loanNoCounts[id] > 1) duplicates.push(id);
     });
     
-    // Generate preview of first 5
     for (const row of rawRows) {
         const processed = processRow(row);
         if (processed) validMapped.push(processed);
@@ -213,23 +217,26 @@ export default function ImportPage() {
 
   const handleClearPool = async () => {
     if (!isAdmin) {
-      alert("Security Restriction: Only Admins can clear the master data pool.");
-      return;
+        alert("Security Violation: Only Administrators can clear the pool.");
+        return;
     }
-    
-    if (!confirm("WARNING: This will delete ALL customer records. This is a high-risk action. Proceed?")) return;
+    if (!confirm("⚠️ EXTREME ACTION: This will delete ALL customers and interaction history. Are you sure?")) return;
     
     setIsImporting(true);
-    // Delete all where ID is not null (effective clear)
-    const { error } = await supabase.from('customers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    
-    if (error) {
-      alert(`Pool Clear Failed: ${error.message}`);
-    } else {
-      alert("Executive Pool cleared successfully. You can now do a fresh import.");
-      window.location.reload();
+    try {
+      const { error: err1 } = await supabase.from('interactions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (err1) throw err1;
+
+      const { count, error: err2 } = await supabase.from('customers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (err2) throw err2;
+
+      alert(`Database Purity Restored. Executive Pool is now empty.`);
+      fetchStatus();
+    } catch (error) {
+      alert("Purge Failed: " + error.message);
+    } finally {
+      setIsImporting(false);
     }
-    setIsImporting(false);
   };
 
   if (isCheckingAuth) return <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-dim)' }}>Verifying Security Clearance...</div>;
@@ -242,20 +249,30 @@ export default function ImportPage() {
   );
 
   return (
-    <div className="container safe-bottom">
-      <div style={{ padding: '32px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-         <div>
-            <h1 style={{ fontSize: '28px' }}>Executive Pool Importer</h1>
-            <p style={{ color: 'var(--text-dim)', fontSize: '14px' }}>Mapping assignments and monthly targets.</p>
-         </div>
-         <button className="btn btn-outline" onClick={handleClearPool} style={{ color: '#ef4444', borderColor: '#ef4444' }}>
-            Clear All Data
-         </button>
+    <div className=\"container safe-bottom\">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 900, letterSpacing: '-0.5px' }}>Executive Pool Importer</h1>
+          <p style={{ opacity: 0.6 }}>Mapping assignments and monthly targets.</p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+           <div style={{ fontSize: '10px', fontWeight: 800, opacity: 0.5, textTransform: 'uppercase', marginBottom: '4px' }}>Executive Pool Status</div>
+           <div style={{ fontSize: '14px', fontWeight: 900, color: dbCount === 0 ? 'var(--success)' : 'var(--primary)' }}>
+             {dbCount === null ? 'SYNCING...' : `${dbCount} RECORDS`}
+           </div>
+           <button 
+             className=\"btn\" 
+             style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', fontSize: '10px', padding: '6px 12px', border: '1px solid rgba(239,68,68,0.2)', marginTop: '8px' }} 
+             onClick={handleClearPool}
+           >
+             Clear All Data
+           </button>
+        </div>
       </div>
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode=\"wait\">
         {step === 1 && (
-          <div className="card" style={{ padding: '60px 20px', textAlign: 'center', borderStyle: 'dashed' }}>
+          <div className=\"card\" style={{ padding: '60px 20px', textAlign: 'center', borderStyle: 'dashed' }}>
             <FileSpreadsheet size={48} style={{ color: 'var(--primary)', marginBottom: '20px' }} />
             <input type="file" accept=".xlsx" onChange={handleFileUpload} id="file-upload" style={{ display: 'none' }} />
             <label htmlFor="file-upload" className="btn btn-primary">Select 123.xlsx</label>
