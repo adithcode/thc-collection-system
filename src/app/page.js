@@ -675,7 +675,6 @@ function DashboardContent() {
               </div>
 
                  <div style={{ height: '160px' }} />
-               </div>
 
                {/* STICKY FIELD ACTION BAR */}
                <div style={{ 
