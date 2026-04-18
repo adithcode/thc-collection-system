@@ -162,24 +162,11 @@ export default function ImportPage() {
   const generatePreview = () => {
     const rawRows = file.slice(1);
     const validMapped = [];
-    const loanNoCounts = {};
-    const duplicates = [];
 
-    // Absolute Integrity Guard: Row-Index based uniqueness
+    // Ultimate Separation: Treat every row as a new unique entity
     rawRows.forEach((row, idx) => {
         const processed = processRow(row);
         if (processed) {
-            // Include idx to ensure every physical row in Excel is unique
-            const compositeKey = `${processed.loan_no}_${processed.name}_${idx}`;
-            if (loanNoCounts[compositeKey]) {
-                if (!duplicates.find(d => d.key === compositeKey)) {
-                    duplicates.push({ key: compositeKey, name: processed.name, amount: processed.loan_amount });
-                }
-            }
-            loanNoCounts[compositeKey] = (loanNoCounts[compositeKey] || 0) + 1;
-            
-            // Add original_index for DB tracking
-            processed.id = idx + 2; 
             validMapped.push(processed);
         }
     });
@@ -187,8 +174,8 @@ export default function ImportPage() {
     setPreview({
         rows: validMapped.slice(0, 5),
         total: rawRows.length,
-        uniqueCount: Object.keys(loanNoCounts).length,
-        duplicates: duplicates
+        uniqueCount: rawRows.length, // Matching 1:1 always
+        duplicates: [] // No more merging logic
     });
     setStep(3);
   };
@@ -197,16 +184,18 @@ export default function ImportPage() {
     setIsImporting(true);
     try {
       const finalData = [];
-      file.slice(1).forEach((row, idx) => {
+      file.slice(1).forEach((row) => {
         const processed = processRow(row);
         if (processed) {
-            // Preserve the physical row index for 1:1 tracking
-            processed.id = idx + 2; 
+            // Force separate identity always
+            if (typeof window !== 'undefined') {
+              processed.id = crypto.randomUUID();
+            }
             finalData.push(processed);
         }
       });
 
-      const { error } = await supabase.from('customers').upsert(finalData, { onConflict: ['id'] });
+      const { error } = await supabase.from('customers').insert(finalData);
       if (error) throw error;
 
       alert(`Successfully imported ${finalData.length} records! Initializing assignments.`);
