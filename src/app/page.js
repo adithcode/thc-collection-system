@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [history, setHistory] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [filter, setFilter] = useState("All");
+  const [selectedExec, setSelectedExec] = useState("ALL AGENTS");
 
   useEffect(() => {
     fetchData();
@@ -92,17 +93,25 @@ export default function Dashboard() {
     }
   };
 
-  const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.loan_no?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCustomers = customers.filter(c => {
+    const isDueToday = c.installment_day === currentDayOfMonth;
+    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         c.loan_no?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesExec = selectedExec === 'ALL AGENTS' || c.assigned_executive === selectedExec;
+    const matchesDailyFilter = filter === 'All' || isDueToday;
+    
+    return matchesSearch && matchesExec && matchesDailyFilter;
+  });
+
+  const uniqueExecs = Array.from(new Set(customers.map(c => c.assigned_executive).filter(Boolean))).sort();
 
   if (loading) return null;
 
   const isAdmin = profile?.role === 'admin' || profile?.username === 'pranprakash' || profile?.username === 'adithprakash';
 
-  const totalMonthlyTBC = customers.reduce((acc, c) => acc + (parseFloat(c.month_tbc) || 0), 0);
-  const totalPoolOS = customers.reduce((acc, c) => acc + (parseFloat(c.loan_amount) || 0), 0);
+  const displayCustomers = filteredCustomers;
+  const totalMonthlyTBC = displayCustomers.reduce((acc, c) => acc + (parseFloat(c.month_tbc) || 0), 0);
+  const totalPoolOS = displayCustomers.reduce((acc, c) => acc + (parseFloat(c.loan_amount) || 0), 0);
 
   const todayDate = new Date();
   const currentDayOfMonth = todayDate.getDate();
@@ -161,6 +170,51 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {isAdmin && uniqueExecs.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 800, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            Filter by Executive Agent
+          </div>
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <button
+              onClick={() => setSelectedExec('ALL AGENTS')}
+              style={{
+                whiteSpace: 'nowrap',
+                padding: '8px 16px',
+                borderRadius: '10px',
+                fontSize: '11px',
+                fontWeight: 700,
+                background: selectedExec === 'ALL AGENTS' ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
+                color: selectedExec === 'ALL AGENTS' ? '#000' : 'var(--text-dim)',
+                border: selectedExec === 'ALL AGENTS' ? 'none' : '1px solid var(--border)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              ALL AGENTS
+            </button>
+            {uniqueExecs.map(exec => (
+              <button
+                key={exec}
+                onClick={() => setSelectedExec(exec)}
+                style={{
+                  whiteSpace: 'nowrap',
+                  padding: '8px 16px',
+                  borderRadius: '10px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  background: selectedExec === exec ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
+                  color: selectedExec === exec ? '#000' : 'var(--text-dim)',
+                  border: selectedExec === exec ? 'none' : '1px solid var(--border)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {exec}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ position: 'relative', marginBottom: '20px' }}>
         <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
