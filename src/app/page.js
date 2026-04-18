@@ -5,7 +5,7 @@ import {
   Search, Plus, Filter, Phone, 
   Target, Calendar, ChevronRight,
   LogOut, ClipboardList, Database, AlertCircle, Edit2, ShieldCheck, User as UserIcon, MessageSquare, Save, History,
-  PhoneOff, Clock, XCircle, Handshake, RefreshCw
+  PhoneOff, Clock, XCircle, Handshake, RefreshCw, Check
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
