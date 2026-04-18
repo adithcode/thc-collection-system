@@ -125,8 +125,14 @@ export default function ImportPage() {
           let val = row[headerIndex];
           
           if (['loan_amount', 'month_tbc'].includes(f.key)) {
-            if (typeof val === 'string') val = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
-            if (!val) val = 0;
+            // Hardened Numeric Extraction
+            if (val !== null && val !== undefined) {
+              const strVal = val.toString().replace(/[^0-9.]/g, '');
+              val = strVal ? Number(strVal) : 0;
+            } else {
+              val = 0;
+            }
+            if (isNaN(val)) val = 0;
           }
           
           if (f.key === 'due_date' || f.key === 'installment_day') {
@@ -263,10 +269,29 @@ export default function ImportPage() {
             <h3 style={{ marginBottom: '20px' }}>Previewing Assignments</h3>
             <div style={{ overflowX: 'auto', marginBottom: '30px' }}>
               <table style={{ width: '100%', fontSize: '11px' }}>
-                <thead><tr style={{ borderBottom: '1px solid var(--border)' }}>{FIELD_DEFINITIONS.map(f => <th key={f.key} style={{ padding: '10px' }}>{f.label}</th>)}</tr></thead>
-                <tbody>{preview.map((row, i) => <tr key={i}>{FIELD_DEFINITIONS.map(f => <td key={f.key} style={{ padding: '10px' }}>{row[f.key]}</td>)}</tr>)}</tbody>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '10px', textAlign: 'left' }}>Customer</th>
+                    <th style={{ padding: '10px', textAlign: 'left' }}>Mobile</th>
+                    <th style={{ padding: '10px', textAlign: 'right' }}>Month TBC</th>
+                    <th style={{ padding: '10px', textAlign: 'right' }}>Total Due</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.map((row, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <td style={{ padding: '10px' }}>{row.name}</td>
+                      <td style={{ padding: '10px' }}>{row.phone}</td>
+                      <td style={{ padding: '10px', textAlign: 'right', color: 'var(--primary)', fontWeight: 800 }}>₹{row.month_tbc}</td>
+                      <td style={{ padding: '10px', textAlign: 'right' }}>₹{row.loan_amount}</td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
+            <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '20px', textAlign: 'center' }}>
+               Double check the targets above. If you see ₹0, go back and re-map the columns.
+            </p>
             <button className="btn btn-primary" style={{ width: '100%' }} disabled={isImporting} onClick={handleConfirmImport}>Sync to Executive Portals</button>
           </div>
         )}
