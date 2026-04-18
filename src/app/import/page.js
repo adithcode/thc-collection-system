@@ -165,21 +165,25 @@ export default function ImportPage() {
     const loanNoCounts = {};
     const duplicates = [];
 
-    rawRows.forEach(row => {
+    // Absolute Integrity Guard: Row-Index based uniqueness
+    rawRows.forEach((row, idx) => {
         const processed = processRow(row);
         if (processed) {
-            // Ultra-Granular Composite Identity (7-Factor)
-            const compositeKey = `${processed.loan_no}_${processed.name}_${processed.phone}_${processed.loan_amount}_${processed.month_tbc}_${processed.due_date}_${processed.assigned_executive}`;
+            // Include idx to ensure every physical row in Excel is unique
+            const compositeKey = `${processed.loan_no}_${processed.name}_${idx}`;
             if (loanNoCounts[compositeKey]) {
                 if (!duplicates.find(d => d.key === compositeKey)) {
                     duplicates.push({ key: compositeKey, name: processed.name, amount: processed.loan_amount });
                 }
             }
             loanNoCounts[compositeKey] = (loanNoCounts[compositeKey] || 0) + 1;
+            
+            // Add original_index for DB tracking
+            processed.id = idx + 2; 
             validMapped.push(processed);
         }
     });
-    
+
     setPreview({
         rows: validMapped.slice(0, 5),
         total: rawRows.length,
@@ -192,15 +196,17 @@ export default function ImportPage() {
   const handleConfirmImport = async () => {
     setIsImporting(true);
     try {
-      const dataRows = file.slice(1);
       const finalData = [];
-
-      for (const row of dataRows) {
+      file.slice(1).forEach((row, idx) => {
         const processed = processRow(row);
-        if (processed) finalData.push(processed);
-      }
+        if (processed) {
+            // Preserve the physical row index for 1:1 tracking
+            processed.id = idx + 2; 
+            finalData.push(processed);
+        }
+      });
 
-      const { error } = await supabase.from('customers').upsert(finalData, { onConflict: ['loan_no', 'name', 'phone', 'loan_amount', 'month_tbc', 'due_date', 'assigned_executive'] });
+      const { error } = await supabase.from('customers').upsert(finalData, { onConflict: ['id'] });
       if (error) throw error;
 
       alert(`Successfully imported ${finalData.length} records! Initializing assignments.`);
