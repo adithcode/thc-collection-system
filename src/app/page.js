@@ -513,17 +513,32 @@ function DashboardContent() {
                     <Database size={12} /> {selectedCustomer.loan_no}
                   </p>
                 </div>
-                <a 
-                  href={`tel:${selectedCustomer.phone.replace(/[^0-9+]/g, '')}`} 
-                  onClick={(e) => {
-                    // Force dialer open if standard link is ignored
-                    window.location.href = `tel:${selectedCustomer.phone.replace(/[^0-9+]/g, '')}`;
-                  }}
-                  className="btn-icon" 
-                  style={{ background: 'var(--primary)', color: '#000', padding: '12px', borderRadius: '14px' }}
-                >
-                  <Phone size={20} />
-                </a>
+                 <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      onClick={() => {
+                        const phone = selectedCustomer.phone?.replace(/[^0-9+]/g, '');
+                        if (phone) window.location.href = `tel:${phone}`;
+                        else alert("No valid phone number assigned to this customer.");
+                      }}
+                      className="btn-icon" 
+                      style={{ background: 'var(--primary)', color: '#000', padding: '12px', borderRadius: '14px' }}
+                    >
+                      <Phone size={20} />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        const phone = selectedCustomer.phone;
+                        if (phone) {
+                          navigator.clipboard.writeText(phone);
+                          alert("Number copied! You can now paste it in your dialer.");
+                        }
+                      }}
+                      className="btn-icon" 
+                      style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-dim)', padding: '12px', borderRadius: '14px', border: '1px solid var(--border)' }}
+                    >
+                      <ClipboardList size={18} />
+                    </button>
+                 </div>
               </div>
 
               <div style={{ marginBottom: '32px' }}>
@@ -574,11 +589,14 @@ function DashboardContent() {
                  </div>
               </div>
 
-              <div style={{ marginBottom: '32px', padding: '20px', background: 'rgba(197,160,89,0.03)', borderRadius: '20px', border: '1px solid rgba(197,160,89,0.2)' }}>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                    <Save size={14} style={{ color: 'var(--primary)' }} />
-                    <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>Log Collection (Money Received)</div>
-                 </div>
+               <div 
+                 id="log-collection-form"
+                 style={{ marginBottom: '32px', padding: '20px', background: 'rgba(197,160,89,0.03)', borderRadius: '20px', border: '1px solid rgba(197,160,89,0.2)' }}
+               >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                     <Save size={14} style={{ color: 'var(--primary)' }} />
+                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>Log Collection (Money Received)</div>
+                  </div>
                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                     <input 
                       type="number" 
@@ -656,7 +674,45 @@ function DashboardContent() {
                  )}
               </div>
 
-              <div style={{ height: '40px' }} />
+                 <div style={{ height: '160px' }} />
+               </div>
+
+               {/* STICKY FIELD ACTION BAR */}
+               <div style={{ 
+                 position: 'fixed', 
+                 bottom: 0, 
+                 left: 0, 
+                 right: 0, 
+                 padding: '24px 20px calc(24px + env(safe-area-inset-bottom, 0px))', 
+                 background: 'rgba(20, 20, 21, 0.85)', 
+                 backdropFilter: 'blur(24px)', 
+                 WebkitBackdropFilter: 'blur(24px)',
+                 borderTop: '1px solid var(--border)',
+                 zIndex: 110,
+                 display: 'flex',
+                 gap: '12px'
+               }}>
+                  <button 
+                    onClick={() => {
+                      const phone = selectedCustomer.phone?.replace(/[^0-9+]/g, '');
+                      if (phone) window.location.href = `tel:${phone}`;
+                      else alert("No valid phone number assigned.");
+                    }}
+                    style={{ flex: 1, background: 'rgba(197,160,89,0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '16px', borderRadius: '16px', fontWeight: 800, fontSize: '13px' }}
+                  >
+                    <Phone size={18} /> CALL
+                  </button>
+                  <button 
+                    onClick={() => {
+                       const form = document.getElementById('log-collection-form');
+                       if (form) form.scrollIntoView({ behavior: 'smooth' });
+                       else alert("Collection form is loading...");
+                    }}
+                    style={{ flex: 2, background: 'var(--primary)', color: '#000', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '16px', borderRadius: '16px', fontWeight: 900, fontSize: '14px', boxShadow: '0 8px 30px rgba(197,160,89,0.3)' }}
+                  >
+                    <Save size={18} /> LOG COLLECTION
+                  </button>
+               </div>
             </motion.div>
           </>
         )}
