@@ -167,25 +167,21 @@ export default function ImportPage() {
 
     rawRows.forEach(row => {
         const processed = processRow(row);
-        if (processed && processed.loan_no) {
-            // Maximum Entropy Identity for Multi-Loan Support
-            const compositeKey = `${processed.loan_no}_${processed.name}_${processed.loan_amount}_${processed.due_date}_${processed.assigned_executive}`;
+        if (processed) {
+            // Ultra-Granular Composite Identity (7-Factor)
+            const compositeKey = `${processed.loan_no}_${processed.name}_${processed.phone}_${processed.loan_amount}_${processed.month_tbc}_${processed.due_date}_${processed.assigned_executive}`;
+            if (loanNoCounts[compositeKey]) {
+                if (!duplicates.find(d => d.key === compositeKey)) {
+                    duplicates.push({ key: compositeKey, name: processed.name, amount: processed.loan_amount });
+                }
+            }
             loanNoCounts[compositeKey] = (loanNoCounts[compositeKey] || 0) + 1;
+            validMapped.push(processed);
         }
     });
-
-    Object.keys(loanNoCounts).forEach(key => {
-        if (loanNoCounts[key] > 1) duplicates.push(key);
-    });
-    
-    for (const row of rawRows) {
-        const processed = processRow(row);
-        if (processed) validMapped.push(processed);
-        if (validMapped.length >= 5) break;
-    }
     
     setPreview({
-        rows: validMapped,
+        rows: validMapped.slice(0, 5),
         total: rawRows.length,
         uniqueCount: Object.keys(loanNoCounts).length,
         duplicates: duplicates
@@ -204,7 +200,7 @@ export default function ImportPage() {
         if (processed) finalData.push(processed);
       }
 
-      const { error } = await supabase.from('customers').upsert(finalData, { onConflict: ['loan_no', 'name', 'loan_amount', 'due_date', 'assigned_executive'] });
+      const { error } = await supabase.from('customers').upsert(finalData, { onConflict: ['loan_no', 'name', 'phone', 'loan_amount', 'month_tbc', 'due_date', 'assigned_executive'] });
       if (error) throw error;
 
       alert(`Successfully imported ${finalData.length} records! Initializing assignments.`);
@@ -324,8 +320,19 @@ export default function ImportPage() {
                   </div>
                </div>
                {preview.duplicates.length > 0 && (
-                  <div style={{ marginTop: '12px', padding: '8px', background: 'rgba(255,159,10,0.1)', borderRadius: '8px', color: 'var(--warning)', fontSize: '10px', fontWeight: 600 }}>
-                    ⚠️ WARNING: {preview.duplicates.length} Duplicate **Loan Numbers** found. (Names can be the same, but each Loan Number must be unique). Merged rows will show the latest data.
+                  <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(255,159,10,0.05)', borderRadius: '12px', border: '1px solid rgba(255,159,10,0.2)' }}>
+                    <div style={{ color: 'var(--warning)', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', marginBottom: '8px' }}>
+                       ⚠️ Potential Overwrites Detected ({preview.duplicates.length} accounts)
+                    </div>
+                    <div style={{ maxHeight: '60px', overflowY: 'auto', fontSize: '9px', opacity: 0.8 }}>
+                       {preview.duplicates.slice(0, 3).map((d, idx) => (
+                          <div key={idx} style={{ marginBottom: '4px' }}>• {d.name} (₹{d.amount})</div>
+                       ))}
+                       {preview.duplicates.length > 3 && <div>...and {preview.duplicates.length - 3} more</div>}
+                    </div>
+                    <p style={{ fontSize: '9px', marginTop: '8px', opacity: 0.6 }}>
+                       The system will merge these identical rows. If they should be separate, check your mappings.
+                    </p>
                   </div>
                )}
             </div>
