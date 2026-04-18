@@ -3,10 +3,14 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { User, Lock } from "lucide-react";
+import { User, Lock, AlertCircle } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const status = searchParams.get('status');
+  
   const [formData, setFormData] = useState({
     name: "",
     password: "",
@@ -38,6 +42,16 @@ export default function LoginPage() {
           <Image src="/logo.png" alt="THC Group" width={200} height={60} style={{ objectFit: 'contain' }} priority />
           <h2 style={{ fontSize: '14px', color: 'var(--text-dim)', marginTop: '12px', letterSpacing: '0.1em', fontWeight: 800 }}>COLLECTION PORTAL</h2>
         </div>
+
+        {status === 'pending' && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} style={{ background: 'rgba(255,159,10,0.1)', color: 'var(--warning)', padding: '12px', borderRadius: '12px', marginBottom: '24px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid rgba(255,159,10,0.2)' }}>
+            <AlertCircle size={16} />
+            <div>
+              <div style={{ fontWeight: 800 }}>PENDING APPROVAL</div>
+              <div style={{ opacity: 0.8 }}>Contact Admin to activate your workplace.</div>
+            </div>
+          </motion.div>
+        )}
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div>
