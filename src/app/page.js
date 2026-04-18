@@ -1,0 +1,355 @@
+"use client";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { 
+  Search, Plus, Filter, Phone, 
+  Target, Calendar, ChevronRight,
+  LogOut, ClipboardList, Database, AlertCircle, Edit2, ShieldCheck, User as UserIcon, MessageSquare, Save, History,
+  PhoneOff, Clock, XCircle, Handshake
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+
+import { useRouter } from "next/navigation";
+
+export default function Dashboard() {
+  const router = useRouter();
+  const [customers, setCustomers] = useState([]);
+  const [allCount, setAllCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [remark, setRemark] = useState("");
+  const [history, setHistory] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [filter, setFilter] = useState("All");
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  async function fetchData() {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      router.push("/login");
+      return;
+    }
+
+    if (session) {
+      const { data: prof } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+      setProfile(prof);
+      const { count } = await supabase.from('customers').select('*', { count: 'exact', head: true });
+      setAllCount(count || 0);
+
+      let query = supabase.from('customers').select('*');
+      const isMasterAdmin = prof?.role === 'admin' || prof?.username === 'pranprakash' || prof?.username === 'adithprakash';
+
+      if (!isMasterAdmin) {
+         const myIdentity = prof?.full_name_excel || prof?.username || "SECURE_LOCK";
+         if (myIdentity === "SECURE_LOCK") query = query.eq('id', '00000000-0000-0000-0000-000000000000');
+         else query = query.ilike('assigned_executive', `%${myIdentity}%`);
+      }
+      
+      const { data: custs } = await query.order('created_at', { ascending: false });
+      setCustomers(custs || []);
+    }
+    setLoading(false);
+  }
+
+  const fetchHistory = async (custId) => {
+    const { data } = await supabase.from('interactions').select('*').eq('customer_id', custId).order('created_at', { ascending: false }).limit(5);
+    setHistory(data || []);
+  };
+
+  const handleSaveInteraction = async (manualRemark = null) => {
+    const entryRemark = manualRemark || remark;
+    if (!entryRemark.trim()) return;
+    
+    setIsSaving(true);
+    const { error } = await supabase.from('interactions').insert({
+      customer_id: selectedCustomer.id,
+      agent_id: profile.id,
+      remark: entryRemark,
+      type: 'Call'
+    });
+    if (!error) {
+      setRemark("");
+      fetchHistory(selectedCustomer.id);
+    }
+    setIsSaving(false);
+  };
+
+  const updateInstallmentDay = async (newDay) => {
+    const day = parseInt(newDay);
+    if (isNaN(day) || day < 1 || day > 31) return;
+    const { error } = await supabase.from('customers').update({ installment_day: day }).eq('id', selectedCustomer.id);
+    if (!error) {
+       setSelectedCustomer({...selectedCustomer, installment_day: day});
+       fetchData();
+    }
+  };
+
+  const filteredCustomers = customers.filter(c => 
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    c.loan_no?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (loading) return null;
+
+  const isAdmin = profile?.role === 'admin' || profile?.username === 'pranprakash' || profile?.username === 'adithprakash';
+
+  const totalMonthlyTBC = customers.reduce((acc, c) => acc + (parseFloat(c.month_tbc) || 0), 0);
+  const totalPoolOS = customers.reduce((acc, c) => acc + (parseFloat(c.loan_amount) || 0), 0);
+
+  const todayDate = new Date();
+  const currentDayOfMonth = todayDate.getDate();
+  const formattedDate = todayDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  return (
+    <div className="container safe-bottom">
+      <div style={{ padding: '32px 0 20px', position: 'relative' }}>
+        <div style={{ position: 'absolute', top: '32px', right: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button 
+            onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
+            className="btn-icon"
+            style={{ background: 'rgba(255,59,48,0.1)', color: '#FF3B30', padding: '8px', borderRadius: '10px' }}
+          >
+            <LogOut size={16} />
+          </button>
+          
+          <div style={{ 
+              background: isAdmin ? 'var(--primary)' : 'rgba(255,255,255,0.05)', 
+              color: isAdmin ? '#000' : 'var(--text-dim)',
+              padding: '4px 10px',
+              borderRadius: '20px',
+              fontSize: '9px',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: isAdmin ? 'none' : '1px solid var(--border)'
+          }}>
+             {isAdmin ? <ShieldCheck size={10} /> : <UserIcon size={10} />}
+             {isAdmin ? 'MASTER ADMIN' : 'RESTRICTED AGENT'}
+          </div>
+        </div>
+        
+        <p style={{ color: 'var(--primary)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+          {formattedDate}
+        </p>
+        <p style={{ color: 'var(--text-dim)', fontSize: '10px', marginTop: '2px', opacity: 0.7 }}>
+          Active Session: {profile?.username}
+        </p>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '24px' }}>
+          <div>
+            <div className="gold-text" style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>
+              ₹{totalMonthlyTBC.toLocaleString('en-IN')}
+            </div>
+            <div style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 700 }}>MONTHLY TARGET</div>
+          </div>
+          {isAdmin && (
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '24px', fontWeight: 800, color: '#FFF', letterSpacing: '-0.02em' }}>
+                ₹{totalPoolOS.toLocaleString('en-IN')}
+              </div>
+              <div style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 700 }}>TOTAL PORTFOLIO O/S</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ position: 'relative', marginBottom: '20px' }}>
+        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+        <input type="text" placeholder="Search my workload..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ paddingLeft: '40px', background: '#141415' }} />
+      </div>
+
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+        <button 
+          onClick={() => setFilter('All')} 
+          style={{ 
+            flex: 1, 
+            background: filter === 'All' ? 'var(--primary)' : 'rgba(255,255,255,0.03)', 
+            color: filter === 'All' ? '#000' : 'var(--text-dim)',
+            border: filter === 'All' ? 'none' : '1px solid var(--border)',
+            padding: '10px',
+            borderRadius: '10px',
+            fontSize: '11px',
+            fontWeight: 800
+          }}
+        >
+          ALL CASES
+        </button>
+        <button 
+          onClick={() => setFilter('Due Today')} 
+          style={{ 
+            flex: 1, 
+            background: filter === 'Due Today' ? 'var(--primary)' : 'rgba(197,160,89,0.05)', 
+            color: filter === 'Due Today' ? '#000' : 'var(--text-dim)',
+            border: filter === 'Due Today' ? 'none' : '1px solid var(--border)',
+            padding: '10px',
+            borderRadius: '10px',
+            fontSize: '11px',
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
+          }}
+        >
+          <Target size={12} /> DUE TODAY
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {filteredCustomers.length > 0 ? (
+          filteredCustomers.map((customer) => {
+            const isDueToday = customer.installment_day === currentDayOfMonth;
+            if (filter === 'Due Today' && !isDueToday) return null;
+            
+            return (
+              <div key={customer.id} className="card" onClick={() => { setSelectedCustomer(customer); setIsDetailOpen(true); fetchHistory(customer.id); }} 
+                style={{ 
+                  padding: '16px', 
+                  borderLeft: isDueToday ? '3px solid var(--primary)' : '1px solid var(--border)',
+                  background: isDueToday ? 'rgba(197,160,89,0.02)' : 'var(--card-bg)'
+                }}
+              >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '14px' }}>{customer.name}</div>
+                    {isDueToday && (
+                      <span style={{ background: 'var(--primary)', color: '#000', fontSize: '8px', padding: '2px 6px', borderRadius: '4px', fontWeight: 900, textTransform: 'uppercase' }}>
+                        DUE TODAY
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '9px', color: 'var(--text-dim)', marginTop: '4px' }}>
+                     Day {customer.installment_day || '—'} • {customer.loan_no}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="gold-text" style={{ fontWeight: 800 }}>₹{(parseFloat(customer.month_tbc) || 0).toLocaleString('en-IN')}</div>
+                  <div style={{ fontSize: '8px', opacity: 0.6 }}>{isAdmin ? customer.assigned_executive : 'MY TBC'}</div>
+                </div>
+              </div>
+            </div>
+            );
+          })
+        ) : (
+          <div style={{ padding: '60px 20px', textAlign: 'center', opacity: 0.5 }}>
+             <AlertCircle size={40} style={{ margin: '0 auto 16px' }} />
+             <p style={{ fontSize: '14px' }}>No cases found matching this filter.</p>
+          </div>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {isDetailOpen && selectedCustomer && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="drawer-overlay" onClick={() => setIsDetailOpen(false)} />
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="drawer" style={{ height: '85vh', overflowY: 'auto' }}>
+              <div className="drawer-handle" />
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
+                 <div>
+                    <h2 style={{ fontSize: '22px' }}>{selectedCustomer.name}</h2>
+                    <p style={{ color: 'var(--primary)', fontSize: '12px', fontWeight: 800 }}>{selectedCustomer.loan_no}</p>
+                 </div>
+                 <a href={`tel:${selectedCustomer.phone}`} style={{ background: 'var(--success)', padding: '12px', borderRadius: '50%', color: '#000' }}><Phone size={20} fill="currentColor" /></a>
+              </div>
+
+              {/* Collection Day Grid (The 'Good Way') */}
+              <div style={{ marginBottom: '24px' }}>
+                 <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '12px', fontWeight: 800, letterSpacing: '0.1em' }}>SET COLLECTION DAY</div>
+                 <div className="hide-scrollbar" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px' }}>
+                    {[...Array(31)].map((_, i) => {
+                       const day = i + 1;
+                       const isSelected = selectedCustomer.installment_day === day;
+                       return (
+                          <motion.button
+                             key={day}
+                             whileTap={{ scale: 0.9 }}
+                             onClick={() => updateInstallmentDay(day)}
+                             style={{
+                                minWidth: '45px',
+                                height: '45px',
+                                borderRadius: '12px',
+                                background: isSelected ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
+                                color: isSelected ? '#000' : 'var(--text)',
+                                border: isSelected ? 'none' : '1px solid var(--border)',
+                                fontSize: '14px',
+                                fontWeight: 800,
+                                flexShrink: 0
+                             }}
+                          >
+                             {day}
+                          </motion.button>
+                       )
+                    })}
+                 </div>
+              </div>
+
+              {/* Quick Actions Toolbelt */}
+              <div style={{ marginBottom: '24px' }}>
+                 <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', letterSpacing: '0.1em' }}>QUICK LOG ACTIONS</div>
+                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <button onClick={() => handleSaveInteraction("🤝 PROMISED TO PAY")} className="btn btn-outline" style={{ border: '1px solid var(--success)', color: 'var(--success)', fontSize: '11px' }}>
+                       <Handshake size={14} /> PROMISED
+                    </button>
+                    <button onClick={() => handleSaveInteraction("📵 SWITCH OFF / NO RANGE")} className="btn btn-outline" style={{ border: '1px solid #FF453A', color: '#FF453A', fontSize: '11px' }}>
+                       <PhoneOff size={14} /> SWITCH OFF
+                    </button>
+                    <button onClick={() => handleSaveInteraction("⏳ BUSY / CALL BACK")} className="btn btn-outline" style={{ border: '1px solid var(--warning)', color: 'var(--warning)', fontSize: '11px' }}>
+                       <Clock size={14} /> BUSY
+                    </button>
+                    <button onClick={() => handleSaveInteraction("🚫 WRONG NUMBER")} className="btn btn-outline" style={{ border: '1px solid #8E8E93', color: '#8E8E93', fontSize: '11px' }}>
+                       <XCircle size={14} /> WRONG NO.
+                    </button>
+                 </div>
+              </div>
+
+              {/* Remarks & History */}
+              <div style={{ marginBottom: '24px' }}>
+                 <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <MessageSquare size={14} /> DETAILED REMARKS
+                 </div>
+                 <textarea value={remark} onChange={(e) => setRemark(e.target.value)} placeholder="Type custom notes here..." style={{ height: '80px', marginBottom: '12px' }} />
+                 <button className="btn btn-primary" onClick={() => handleSaveInteraction()} disabled={isSaving} style={{ width: '100%', padding: '16px' }}>
+                    {isSaving ? 'Saving...' : 'SUBMIT REMARK'}
+                 </button>
+              </div>
+
+              {/* History Timeline */}
+              <div>
+                 <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <History size={14} /> PREVIOUS LOGS
+                 </div>
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {history.length > 0 ? history.map(h => (
+                      <div key={h.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px' }}>
+                         <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '4px' }}>{new Date(h.created_at).toLocaleString('en-IN')}</div>
+                         <div style={{ fontSize: '13px' }}>{h.remark}</div>
+                      </div>
+                    )) : (
+                      <div style={{ fontSize: '11px', color: 'var(--text-dim)', textAlign: 'center', padding: '20px' }}>No previous logs found.</div>
+                    )}
+                 </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+      
+      {/* Diagnostics Bar */}
+      <div style={{ position: 'fixed', bottom: '80px', left: '20px', right: '20px', background: 'rgba(20,20,21,0.95)', padding: '10px 16px', borderRadius: '12px', fontSize: '10px', color: 'var(--text-dim)', display: 'flex', justifyContent: 'space-between', border: '1px solid var(--border)', zIndex: 100, backdropFilter: 'blur(10px)' }}>
+        <div>POOL: <b style={{ color: '#FFF' }}>{allCount}</b> | IDENT: <b style={{ color: 'var(--primary)' }}>{profile?.username}</b></div>
+        <div style={{ color: '#FFF', fontWeight: 700 }}>{isAdmin ? "MASTER ADMIN CONTROL" : "AGENT SECURE"}</div>
+      </div>
+    </div>
+  );
+}
