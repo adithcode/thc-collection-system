@@ -49,6 +49,7 @@ export default function ImportPage() {
     { key: "loan_no", label: "Loan No", required: true },
     { key: "name", label: "Customer Name", required: true },
     { key: "assigned_executive", label: "Executive (Agent)", required: true },
+    { key: "phone", label: "Mobile Number", required: true },
     { key: "month_tbc", label: "Month TBC (EMI)", required: true },
     { key: "due_date", label: "Last Due Date", required: true },
     { key: "loan_amount", label: "Total Due", required: true },
@@ -83,6 +84,7 @@ export default function ImportPage() {
                    (f.key === 'loan_no' && lowH.includes('agreement')) ||
                    (f.key === 'month_tbc' && lowH === 'month') ||
                    (f.key === 'assigned_executive' && lowH.includes('executive')) ||
+                   (f.key === 'phone' && (lowH.includes('phone') || lowH.includes('mobile') || lowH.includes('contact'))) ||
                    (f.key === 'installment_day' && lowH.includes('inst. date'));
           });
           if (match) autoMap[f.key] = match;
@@ -163,7 +165,6 @@ export default function ImportPage() {
             entry.installment_day = new Date(entry.due_date).getDate();
         }
 
-        entry.phone = 'NA';
         finalData.push(entry);
       }
 
