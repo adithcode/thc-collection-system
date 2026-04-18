@@ -249,7 +249,7 @@ export default function ImportPage() {
   );
 
   return (
-    <div className=\"container safe-bottom\">
+    <div className="container safe-bottom">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 900, letterSpacing: '-0.5px' }}>Executive Pool Importer</h1>
@@ -261,7 +261,7 @@ export default function ImportPage() {
              {dbCount === null ? 'SYNCING...' : `${dbCount} RECORDS`}
            </div>
            <button 
-             className=\"btn\" 
+             className="btn" 
              style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', fontSize: '10px', padding: '6px 12px', border: '1px solid rgba(239,68,68,0.2)', marginTop: '8px' }} 
              onClick={handleClearPool}
            >
@@ -270,9 +270,9 @@ export default function ImportPage() {
         </div>
       </div>
 
-      <AnimatePresence mode=\"wait\">
+      <AnimatePresence mode="wait">
         {step === 1 && (
-          <div className=\"card\" style={{ padding: '60px 20px', textAlign: 'center', borderStyle: 'dashed' }}>
+          <div className="card" style={{ padding: '60px 20px', textAlign: 'center', borderStyle: 'dashed' }}>
             <FileSpreadsheet size={48} style={{ color: 'var(--primary)', marginBottom: '20px' }} />
             <input type="file" accept=".xlsx" onChange={handleFileUpload} id="file-upload" style={{ display: 'none' }} />
             <label htmlFor="file-upload" className="btn btn-primary">Select 123.xlsx</label>
