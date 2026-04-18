@@ -110,7 +110,7 @@ function DashboardContent() {
     }
     setLoading(false);
   }
-
+  const fetchHistory = async (custId) => {
     const { data: interactions } = await supabase
       .from('interactions')
       .select('*, profiles(username, full_name_excel)')
