@@ -1,18 +1,49 @@
 "use client";
-import { useState } from "react";
+import { useEffect } from "react";
 import * as XLSX from "xlsx";
-import Link from "next/navigation";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, Lock } from "lucide-react";
 
 export default function ImportPage() {
+  const router = useRouter();
+  const [profile, setProfile] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [file, setFile] = useState(null);
   const [headers, setHeaders] = useState([]);
   const [mapping, setMapping] = useState({});
   const [preview, setPreview] = useState([]);
   const [step, setStep] = useState(1);
   const [isImporting, setIsImporting] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    checkAdmin();
+  }, []);
+
+  const checkAdmin = async () => {
+    setIsCheckingAuth(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      router.push("/login");
+      return;
+    }
+
+    const { data: prof } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+    const adminStatus = prof?.role === 'admin' || prof?.username === 'pranprakash' || prof?.username === 'adithprakash';
+    
+    setProfile(prof);
+    setIsAdmin(adminStatus);
+    setIsCheckingAuth(false);
+    
+    if (!adminStatus) {
+      setTimeout(() => {
+        alert("ACCESS DENIED: You must be an administrator to access the Executive Pool Importer.");
+        router.push("/");
+      }, 500);
+    }
+  };
 
   const FIELD_DEFINITIONS = [
     { key: "loan_no", label: "Loan No", required: true },
@@ -150,15 +181,34 @@ export default function ImportPage() {
   };
 
   const handleClearPool = async () => {
-    if (!confirm("WARNING: This will delete ALL 1431 records. High-risk action. Proceed?")) return;
+    if (!isAdmin) {
+      alert("Security Restriction: Only Admins can clear the master data pool.");
+      return;
+    }
+    
+    if (!confirm("WARNING: This will delete ALL customer records. This is a high-risk action. Proceed?")) return;
+    
     setIsImporting(true);
+    // Delete all where ID is not null (effective clear)
     const { error } = await supabase.from('customers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (!error) {
-        alert("Pool cleared successfully. You can now do a fresh import.");
-        window.location.reload();
+    
+    if (error) {
+      alert(`Pool Clear Failed: ${error.message}`);
+    } else {
+      alert("Executive Pool cleared successfully. You can now do a fresh import.");
+      window.location.reload();
     }
     setIsImporting(false);
   };
+
+  if (isCheckingAuth) return <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-dim)' }}>Verifying Security Clearance...</div>;
+  if (!isAdmin) return (
+    <div style={{ padding: '80px 20px', textAlign: 'center' }}>
+      <Lock size={48} style={{ color: '#ef4444', marginBottom: '20px', margin: '0 auto' }} />
+      <h2 style={{ color: '#ef4444' }}>Restricted Access</h2>
+      <p style={{ marginTop: '12px', opacity: 0.6 }}>Only authorized administrators can access the importer.</p>
+    </div>
+  );
 
   return (
     <div className="container safe-bottom">

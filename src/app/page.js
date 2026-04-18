@@ -147,9 +147,21 @@ function DashboardContent() {
   };
 
   const handleClearHistory = async () => {
+    if (!isAdmin) {
+      alert("Security Restriction: Only Admins can permanently delete interaction history.");
+      return;
+    }
+
     if (!confirm("Are you sure you want to permanently delete all interaction history for this customer? (Payment history will NOT be deleted)")) return;
+    
     const { error } = await supabase.from('interactions').delete().eq('customer_id', selectedCustomer.id);
-    if (!error) fetchHistory(selectedCustomer.id);
+    
+    if (error) {
+      alert(`Clear Failed: ${error.message}`);
+    } else {
+      alert("Interaction history cleared successfully.");
+      fetchHistory(selectedCustomer.id);
+    }
   };
 
   const handleLogCollection = async () => {
