@@ -5,7 +5,7 @@ import {
   Search, Plus, Filter, Phone, 
   Target, Calendar, ChevronRight,
   LogOut, ClipboardList, Database, AlertCircle, Edit2, ShieldCheck, User as UserIcon, MessageSquare, Save, History,
-  PhoneOff, Clock, XCircle, Handshake
+  PhoneOff, Clock, XCircle, Handshake, RefreshCw
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -52,6 +52,7 @@ function DashboardContent() {
   }, [isDetailOpen, searchParams]);
 
   async function fetchData() {
+    setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
@@ -137,6 +138,20 @@ function DashboardContent() {
     <div className="container safe-bottom">
       <div style={{ padding: '32px 0 20px', position: 'relative' }}>
         <div style={{ position: 'absolute', top: '32px', right: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button 
+            onClick={() => fetchData()}
+            className="btn-icon"
+            style={{ background: 'rgba(197,160,89,0.1)', color: 'var(--primary)', padding: '8px', borderRadius: '10px' }}
+          >
+            <motion.div
+              animate={{ rotate: loading ? 360 : 0 }}
+              transition={{ repeat: loading ? Infinity : 0, duration: 1, ease: "linear" }}
+              style={{ display: 'flex' }}
+            >
+              <RefreshCw size={16} />
+            </motion.div>
+          </button>
+
           <button 
             onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
             className="btn-icon"
