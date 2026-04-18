@@ -16,6 +16,9 @@ export default function Dashboard() {
   const [customers, setCustomers] = useState([]);
   const [allCount, setAllCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const todayDate = new Date();
+  const currentDayOfMonth = todayDate.getDate();
+  const formattedDate = todayDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
   const [profile, setProfile] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   
@@ -112,10 +115,6 @@ export default function Dashboard() {
   const displayCustomers = filteredCustomers;
   const totalMonthlyTBC = displayCustomers.reduce((acc, c) => acc + (parseFloat(c.month_tbc) || 0), 0);
   const totalPoolOS = displayCustomers.reduce((acc, c) => acc + (parseFloat(c.loan_amount) || 0), 0);
-
-  const todayDate = new Date();
-  const currentDayOfMonth = todayDate.getDate();
-  const formattedDate = todayDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
     <div className="container safe-bottom">
