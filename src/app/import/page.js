@@ -156,14 +156,34 @@ export default function ImportPage() {
   const generatePreview = () => {
     const rawRows = file.slice(1);
     const validMapped = [];
+    const loanNoCounts = {};
+    const duplicates = [];
+
+    // Analyze full file for integrity
+    rawRows.forEach(row => {
+        const processed = processRow(row);
+        if (processed && processed.loan_no) {
+            loanNoCounts[processed.loan_no] = (loanNoCounts[processed.loan_no] || 0) + 1;
+        }
+    });
+
+    Object.keys(loanNoCounts).forEach(id => {
+        if (loanNoCounts[id] > 1) duplicates.push(id);
+    });
     
+    // Generate preview of first 5
     for (const row of rawRows) {
         const processed = processRow(row);
         if (processed) validMapped.push(processed);
         if (validMapped.length >= 5) break;
     }
     
-    setPreview(validMapped);
+    setPreview({
+        rows: validMapped,
+        total: rawRows.length,
+        uniqueCount: Object.keys(loanNoCounts).length,
+        duplicates: duplicates
+    });
     setStep(3);
   };
 
@@ -262,19 +282,41 @@ export default function ImportPage() {
 
         {step === 3 && (
           <div className="card">
-            <h3 style={{ marginBottom: '20px' }}>Previewing Assignments</h3>
+            <h3 style={{ marginBottom: '8px' }}>Previewing Assignments</h3>
+            <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '20px' }}>
+               Verify if the columns matched correctly.
+            </p>
+
+            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', marginBottom: '24px', border: '1px solid var(--border)' }}>
+               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Spreadsheet Scope</div>
+                     <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px' }}>{preview.total} Rows</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                     <div style={{ fontSize: '10px', fontWeight: 800, color: preview.total !== preview.uniqueCount ? 'var(--warning)' : 'var(--success)', textTransform: 'uppercase' }}>Unique Identifiers</div>
+                     <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px', color: preview.total !== preview.uniqueCount ? 'var(--warning)' : 'var(--success)' }}>{preview.uniqueCount} Records</div>
+                  </div>
+               </div>
+               {preview.duplicates.length > 0 && (
+                  <div style={{ marginTop: '12px', padding: '8px', background: 'rgba(255,159,10,0.1)', borderRadius: '8px', color: 'var(--warning)', fontSize: '10px', fontWeight: 600 }}>
+                    ⚠️ WARNING: {preview.duplicates.length} Duplicate Loan IDs found. These records will be merged (overwritten). Check your mapping for 'Loan No'.
+                  </div>
+               )}
+            </div>
+
             <div style={{ overflowX: 'auto', marginBottom: '30px' }}>
               <table style={{ width: '100%', fontSize: '11px' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ padding: '10px', textAlign: 'left' }}>Customer</th>
-                    <th style={{ padding: '10px', textAlign: 'left' }}>Mobile</th>
-                    <th style={{ padding: '10px', textAlign: 'right' }}>Month TBC</th>
-                    <th style={{ padding: '10px', textAlign: 'right' }}>Total Due</th>
+                    <th style={{ padding: '10px', textAlign: 'left' }}>Customer<br/><span style={{ fontSize: '8px', opacity: 0.5 }}>from {mapping.name}</span></th>
+                    <th style={{ padding: '10px', textAlign: 'left' }}>Mobile<br/><span style={{ fontSize: '8px', opacity: 0.5 }}>from {mapping.phone}</span></th>
+                    <th style={{ padding: '10px', textAlign: 'right' }}>Month TBC<br/><span style={{ fontSize: '8px', opacity: 0.5 }}>from {mapping.month_tbc}</span></th>
+                    <th style={{ padding: '10px', textAlign: 'right' }}>Total Due<br/><span style={{ fontSize: '8px', opacity: 0.5 }}>from {mapping.loan_amount}</span></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {preview.map((row, i) => (
+                  {preview.rows.map((row, i) => (
                     <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                       <td style={{ padding: '10px' }}>{row.name}</td>
                       <td style={{ padding: '10px' }}>{row.phone}</td>
