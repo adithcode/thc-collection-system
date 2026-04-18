@@ -156,9 +156,12 @@ export default function ImportPage() {
           entry[f.key] = val ?? null;
         });
 
-        // Ensure mandatory numeric fields aren't null
-        if (entry.loan_amount === null) entry.loan_amount = 0;
-        if (entry.month_tbc === null) entry.month_tbc = 0;
+        // Sanitize identifiers
+        if (entry.loan_no) entry.loan_no = entry.loan_no.toString().trim();
+        if (entry.name) entry.name = entry.name.trim();
+
+        // Zero-Value Safety Gate: Skip ghost rows from Excel
+        if (entry.month_tbc === 0 && entry.loan_amount === 0) continue;
 
         // Smart Day Calculation Logic (User Requirement)
         if (!entry.installment_day && entry.due_date) {
@@ -168,7 +171,7 @@ export default function ImportPage() {
         finalData.push(entry);
       }
 
-      const { error } = await supabase.from('customers').insert(finalData);
+      const { error } = await supabase.from('customers').upsert(finalData, { onConflict: 'loan_no' });
       if (error) throw error;
 
       alert(`Successfully imported ${finalData.length} records! Initializing assignments.`);
