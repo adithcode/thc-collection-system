@@ -223,8 +223,9 @@ function DashboardContent() {
     if (isNaN(day) || day < 1 || day > 31) return;
     const { error } = await supabase.from('customers').update({ installment_day: day }).eq('id', selectedCustomer.id);
     if (!error) {
-       setSelectedCustomer({...selectedCustomer, installment_day: day});
-       fetchData();
+       setSelectedCustomer(prev => ({...prev, installment_day: day}));
+       // Update the local list as well for instant feedback
+       setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? {...c, installment_day: day} : c));
     }
   };
 
@@ -353,154 +354,8 @@ function DashboardContent() {
         <input type="text" placeholder="Search my workload..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ paddingLeft: '40px', background: '#141415' }} />
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-        <button 
-          onClick={() => setFilter('All')} 
-          style={{ 
-            flex: 1, 
-            background: filter === 'All' ? 'var(--primary)' : 'rgba(255,255,255,0.03)', 
-            color: filter === 'All' ? '#000' : 'var(--text-dim)',
-            border: filter === 'All' ? 'none' : '1px solid var(--border)',
-            padding: '10px',
-            borderRadius: '10px',
-            fontSize: '11px',
-            fontWeight: 800
-          }}
-        >
-          ALL CASES
-        </button>
-        <button 
-          onClick={() => setFilter('Due Today')} 
-          style={{ 
-            flex: 1, 
-            background: filter === 'Due Today' ? 'var(--primary)' : 'rgba(197,160,89,0.05)', 
-            color: filter === 'Due Today' ? '#000' : 'var(--text-dim)',
-            border: filter === 'Due Today' ? 'none' : '1px solid var(--border)',
-            padding: '10px',
-            borderRadius: '10px',
-            fontSize: '11px',
-            fontWeight: 800,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px'
-          }}
-        >
-          <Target size={12} /> DUE TODAY
-        </button>
-
-        {isAdmin && (
-          <button 
-            onClick={() => setFilter('Verifications')} 
-            style={{ 
-              flex: 1, 
-              background: filter === 'Verifications' ? 'var(--warning)' : 'rgba(255,159,10,0.05)', 
-              color: filter === 'Verifications' ? '#000' : 'var(--warning)',
-              border: filter === 'Verifications' ? 'none' : '1px solid rgba(255,159,10,0.2)',
-              padding: '10px',
-              borderRadius: '10px',
-              fontSize: '11px',
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px'
-            }}
-          >
-            <ShieldCheck size={12} /> PENDING ({collections.length})
-          </button>
-        )}
-
-        {isAdmin && (
-          <button 
-            onClick={() => setFilter('Ledger')} 
-            style={{ 
-              flex: 1, 
-              background: filter === 'Ledger' ? 'var(--success)' : 'rgba(48, 209, 88, 0.05)', 
-              color: filter === 'Ledger' ? '#000' : 'var(--success)',
-              border: filter === 'Ledger' ? 'none' : '1px solid rgba(48, 209, 88, 0.2)',
-              padding: '10px',
-              borderRadius: '10px',
-              fontSize: '11px',
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px'
-            }}
-          >
-            <History size={12} /> LEDGER
-          </button>
-        )}
-      </div>
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {filter === 'Verifications' ? (
-           collections.length > 0 ? (
-             collections.map((col) => (
-               <div key={col.id} className="card" style={{ padding: '20px', borderLeft: '3px solid var(--warning)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                     <div>
-                        <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--warning)' }}>₹{col.amount.toLocaleString('en-IN')}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '4px' }}>{col.payment_mode} • {col.reference_no || 'No Ref'}</div>
-                     </div>
-                     <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 700, fontSize: '12px' }}>{col.customers.name}</div>
-                        <div style={{ fontSize: '9px', color: 'var(--text-dim)' }}>Agent: {col.profiles.full_name_excel || col.profiles.username}</div>
-                     </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                     <button 
-                        disabled={isVerifying}
-                        onClick={() => acceptCollection(col)}
-                        style={{ flex: 2, background: 'var(--success)', color: '#000', border: 'none', padding: '10px', borderRadius: '8px', fontWeight: 800, fontSize: '11px' }}
-                     >
-                        ACCEPT RECEIPT
-                     </button>
-                     <button 
-                        disabled={isVerifying}
-                        onClick={() => rejectCollection(col.id)}
-                        style={{ flex: 1, background: 'rgba(255,59,48,0.1)', color: '#FF3B30', border: '1px solid rgba(255,59,48,0.2)', padding: '10px', borderRadius: '8px', fontWeight: 700, fontSize: '11px' }}
-                     >
-                        REJECT
-                     </button>
-                  </div>
-               </div>
-             ))
-           ) : (
-             <div style={{ padding: '60px 20px', textAlign: 'center', opacity: 0.5 }}>
-                <ShieldCheck size={40} style={{ margin: '0 auto 16px', color: 'var(--success)' }} />
-                <p style={{ fontSize: '14px' }}>All collections are verified! <br/>Your books are clean.</p>
-             </div>
-           )
-        ) : filter === 'Ledger' ? (
-           verifiedHistory.length > 0 ? (
-             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-               <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--success)', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>Confirmed Audit Ledger (Last 20)</div>
-               {verifiedHistory.map((col, i) => (
-                 <div key={i} className="card" style={{ padding: '16px', borderLeft: '3px solid var(--success)' }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <div>
-                         <div style={{ fontWeight: 800, fontSize: '14px', color: '#FFF' }}>{col.customers?.name}</div>
-                         <div style={{ fontSize: '9px', color: 'var(--text-dim)', marginTop: '4px' }}>
-                           {col.payment_mode} • Confirmed by {col.profiles?.username}
-                         </div>
-                       </div>
-                       <div style={{ textAlign: 'right' }}>
-                         <div style={{ fontWeight: 900, color: 'var(--success)', fontSize: '15px' }}>₹{col.amount.toLocaleString('en-IN')}</div>
-                         <div style={{ fontSize: '8px', opacity: 0.6 }}>{new Date(col.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
-                       </div>
-                     </div>
-                 </div>
-               ))}
-             </div>
-           ) : (
-             <div style={{ padding: '60px 20px', textAlign: 'center', opacity: 0.5 }}>
-                <History size={40} style={{ margin: '0 auto 16px' }} />
-                <p style={{ fontSize: '14px' }}>Audit Ledger is currently empty.</p>
-             </div>
-           )
-        ) : displayCustomers.length > 0 ? (
+        {displayCustomers.length > 0 ? (
           displayCustomers.map((customer) => {
             const isDueToday = customer.installment_day === currentDayOfMonth;
             
@@ -567,6 +422,34 @@ function DashboardContent() {
             >
               <div style={{ width: '40px', height: '4px', background: 'var(--border)', borderRadius: '2px', margin: '0 auto 24px' }} />
               
+              <div style={{ marginBottom: '32px' }}>
+                 <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Set Installment Day</div>
+                 <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '16px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                      <button
+                        key={day}
+                        onClick={() => updateInstallmentDay(day)}
+                        style={{
+                          minWidth: '45px',
+                          height: '45px',
+                          borderRadius: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '14px',
+                          fontWeight: 800,
+                          background: selectedCustomer.installment_day === day ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
+                          color: selectedCustomer.installment_day === day ? '#000' : '#FFF',
+                          border: selectedCustomer.installment_day === day ? 'none' : '1px solid var(--border)',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                 </div>
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
                 <div>
                   <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '4px' }}>{selectedCustomer.name}</h2>

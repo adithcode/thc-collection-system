@@ -75,12 +75,19 @@ export default function ImportPage() {
       const wb = XLSX.read(bstr, { type: "binary" });
       const wsname = wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
+      const rowsMetaData = ws['!rows'] || []; // Capture hidden row metadata
       const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
       
       if (data.length > 0) {
-        const rawHeaders = data[0].map(h => h?.toString().trim() || "");
+        // Filter out rows that are explicitly hidden in Excel
+        const visibleData = data.filter((row, idx) => {
+            if (idx === 0) return true; // Keep headers
+            return !rowsMetaData[idx] || !rowsMetaData[idx].h; // h is hidden
+        });
+        
+        const rawHeaders = visibleData[0].map(h => h?.toString().trim() || "");
         setHeaders(rawHeaders);
-        setFile(data);
+        setFile(visibleData);
         
         const autoMap = {};
         FIELD_DEFINITIONS.forEach(f => {
@@ -165,21 +172,11 @@ export default function ImportPage() {
     const validMapped = [];
 
     // Ultimate Separation: Treat every row as a new unique entity
-    let imported = 0;
-    let skippedHeader = 0;
-    let skippedEmpty = 0;
-
-    rawRows.forEach((row, idx) => {
+    rawRows.forEach((row) => {
         const processed = processRow(row);
-        if (processed) {
-            if (processed.skip === 'header') {
-                skippedHeader++;
-            } else if (processed.skip === 'empty') {
-                skippedEmpty++;
-            } else {
-                validMapped.push(processed);
-                imported++;
-            }
+        if (processed && !processed.skip) {
+            validMapped.push(processed);
+            imported++;
         }
     });
 
@@ -187,36 +184,24 @@ export default function ImportPage() {
         rows: validMapped.slice(0, 5),
         total: rawRows.length,
         imported: imported,
-        skippedHeader: skippedHeader,
-        skippedEmpty: skippedEmpty,
-        uniqueCount: imported,
-        duplicates: []
+        uniqueCount: imported
     });
     setStep(3);
   };
 
   const handleConfirmImport = async () => {
     setIsImporting(true);
-    try {
-      const finalData = [];
-      let skipped = 0;
-
       file.slice(1).forEach((row) => {
         const processed = processRow(row);
         if (processed && !processed.skip) {
-            if (typeof window !== 'undefined') {
-              processed.id = crypto.randomUUID();
-            }
             finalData.push(processed);
-        } else {
-            skipped++;
         }
       });
 
-      const { error } = await supabase.from('customers').insert(finalData);
+      const { error } = await supabase.from('customers').upsert(finalData, { onConflict: ['loan_no'] });
       if (error) throw error;
 
-      alert(`Sync Complete!\nImported: ${finalData.length} Records\nSkipped: ${skipped} (Blank/Header rows)\nTotal Rows in File: ${file.length - 1}`);
+      alert(`Sync Complete!\nImported/Updated: ${finalData.length} Records\nTotal Visible Rows: ${file.length - 1}`);
       window.location.href = "/";
     } catch (err) {
       console.error(err);
@@ -316,28 +301,16 @@ export default function ImportPage() {
             </p>
 
             <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', marginBottom: '24px', border: '1px solid var(--border)' }}>
-               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div>
-                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Rows in File</div>
+                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Visible Rows</div>
                      <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px' }}>{preview.total}</div>
                   </div>
-                  <div style={{ textAlign: 'center' }}>
-                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>Valid Records</div>
+                  <div style={{ textAlign: 'right' }}>
+                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>Ready to Sync</div>
                      <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px', color: 'var(--primary)' }}>{preview.imported}</div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--warning)', textTransform: 'uppercase' }}>Skipped</div>
-                     <div style={{ fontSize: '18px', fontWeight: 900, marginTop: '4px', color: 'var(--warning)' }}>
-                        {preview.skippedEmpty + preview.skippedHeader}
-                     </div>
-                  </div>
                </div>
-               
-               {(preview.skippedEmpty > 0 || preview.skippedHeader > 0) && (
-                  <div style={{ marginTop: '12px', padding: '8px', background: 'rgba(255,159,10,0.05)', borderRadius: '8px', color: 'rgba(255,159,10,0.8)', fontSize: '9px', fontWeight: 600 }}>
-                    ℹ️ Information: {preview.skippedHeader} Header rows and {preview.skippedEmpty} Empty/Invalid rows were automatically filtered to protect port purity.
-                  </div>
-               )}
             </div>
 
             <div style={{ overflowX: 'auto', marginBottom: '30px' }}>
