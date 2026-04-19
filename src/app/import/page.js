@@ -191,6 +191,8 @@ export default function ImportPage() {
 
   const handleConfirmImport = async () => {
     setIsImporting(true);
+    try {
+      const finalData = [];
       file.slice(1).forEach((row) => {
         const processed = processRow(row);
         if (processed && !processed.skip) {
