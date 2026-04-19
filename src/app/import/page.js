@@ -170,6 +170,7 @@ export default function ImportPage() {
   const generatePreview = () => {
     const rawRows = file.slice(1);
     const validMapped = [];
+    let imported = 0;
 
     // Ultimate Separation: Treat every row as a new unique entity
     rawRows.forEach((row) => {
