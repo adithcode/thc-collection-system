@@ -58,7 +58,7 @@ export default function ImportPage() {
     { key: "name", label: "Customer Name", required: true },
     { key: "assigned_executive", label: "Executive (Agent)", required: true },
     { key: "phone", label: "Mobile Number", required: true },
-    { key: "month_tbc", label: "Month TBC (EMI)", required: true },
+    { key: "month_tbc", label: "Month TBC (EMI)", required: false },
     { key: "due_date", label: "Last Due Date", required: true },
     { key: "loan_amount", label: "Total Due", required: true },
     { key: "installment_day", label: "Install Day (Date)", required: false },
@@ -97,13 +97,20 @@ export default function ImportPage() {
             return lowH === lowL || 
                    lowH === f.key.toLowerCase() ||
                    (f.key === 'loan_no' && lowH.includes('agreement')) ||
-                   (f.key === 'month_tbc' && lowH === 'month') ||
+                   (f.key === 'month_tbc' && (lowH === 'month' || lowH.includes('tbc') || lowH.includes('to be collected'))) ||
+                   (f.key === 'loan_amount' && (lowH.includes('total due') || lowH.includes('total dues'))) ||
                    (f.key === 'assigned_executive' && lowH.includes('executive')) ||
                    (f.key === 'phone' && (lowH.includes('phone') || lowH.includes('mobile') || lowH.includes('contact'))) ||
                    (f.key === 'installment_day' && lowH.includes('inst. date'));
           });
           if (match) autoMap[f.key] = match;
         });
+
+        // Hard Fallback: If Month TBC isn't found, map it to the same column as Total Due
+        if (!autoMap.month_tbc && autoMap.loan_amount) {
+          autoMap.month_tbc = autoMap.loan_amount;
+        }
+
         setMapping(autoMap);
         setStep(2);
       }
