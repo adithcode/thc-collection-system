@@ -4,10 +4,14 @@
 -- 1. Customers Table
 CREATE TABLE customers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  loan_no TEXT UNIQUE,
   name TEXT NOT NULL,
   phone TEXT NOT NULL,
+  assigned_executive TEXT,
   loan_amount DECIMAL(12, 2) NOT NULL,
+  month_tbc DECIMAL(12, 2) DEFAULT 0,
   due_date DATE NOT NULL,
+  installment_day INTEGER,
   status TEXT DEFAULT 'Due',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
