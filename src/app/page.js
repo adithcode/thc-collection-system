@@ -30,16 +30,6 @@ function DashboardContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [filter, setFilter] = useState("All");
   const [selectedExec, setSelectedExec] = useState("ALL AGENTS");
-  const [collections, setCollections] = useState([]);
-  const [colFormData, setColFormData] = useState({ 
-    amount: "", 
-    mode: "Cash", 
-    ref: "", 
-    date: new Date().toISOString().split('T')[0] 
-  });
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verifiedHistory, setVerifiedHistory] = useState([]);
-  const [customerCollections, setCustomerCollections] = useState([]);
 
   useEffect(() => {
     fetchData();
@@ -75,25 +65,6 @@ function DashboardContent() {
       setProfile(prof);
       const isMasterAdmin = prof?.role === 'admin' || prof?.username === 'pranprakash' || prof?.username === 'adithprakash';
 
-      if (isMasterAdmin) {
-        // Pending Queue
-        const { data: cols } = await supabase
-          .from('collections')
-          .select('*, customers(name, loan_no), profiles!agent_id(username, full_name_excel)')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false });
-        setCollections(cols || []);
-
-        // Master Ledger (Approved)
-        const { data: vh } = await supabase
-          .from('collections')
-          .select('*, customers(name, loan_no), profiles!agent_id(username, full_name_excel)')
-          .eq('status', 'verified')
-          .order('created_at', { ascending: false })
-          .limit(20);
-        setVerifiedHistory(vh || []);
-      }
-
       const { count } = await supabase.from('customers').select('*', { count: 'exact', head: true });
       setAllCount(count || 0);
 
@@ -110,6 +81,7 @@ function DashboardContent() {
     }
     setLoading(false);
   }
+
   const fetchHistory = async (custId) => {
     const { data: interactions } = await supabase
       .from('interactions')
@@ -118,14 +90,6 @@ function DashboardContent() {
       .order('created_at', { ascending: false })
       .limit(10);
     setHistory(interactions || []);
-
-    const { data: pms } = await supabase
-      .from('collections')
-      .select('*, profiles!agent_id(username, full_name_excel)')
-      .eq('customer_id', custId)
-      .eq('status', 'verified')
-      .order('created_at', { ascending: false });
-    setCustomerCollections(pms || []);
   };
 
   const handleSaveInteraction = async (manualRemark = null) => {
@@ -148,74 +112,14 @@ function DashboardContent() {
 
   const handleClearHistory = async () => {
     if (!isAdmin) {
-      alert("Security Restriction: Only Admins can permanently delete interaction history.");
+      alert("Permission Denied: Only administrators can clear interaction logs.");
       return;
     }
-
-    if (!confirm("Are you sure you want to permanently delete all interaction history for this customer? (Payment history will NOT be deleted)")) return;
+    if (!confirm("Are you sure you want to permanently delete all interaction remarks for this customer?")) return;
     
     const { error } = await supabase.from('interactions').delete().eq('customer_id', selectedCustomer.id);
-    
-    if (error) {
-      alert(`Clear Failed: ${error.message}`);
-    } else {
-      alert("Interaction history cleared successfully.");
-      fetchHistory(selectedCustomer.id);
-    }
-  };
-
-  const handleLogCollection = async () => {
-    if (!colFormData.amount || parseFloat(colFormData.amount) <= 0) return;
-    setIsVerifying(true);
-    
-    const { error } = await supabase.from('collections').insert({
-      customer_id: selectedCustomer.id,
-      agent_id: profile.id,
-      amount: parseFloat(colFormData.amount),
-      payment_mode: colFormData.mode,
-      reference_no: colFormData.ref,
-      created_at: new Date(colFormData.date).toISOString()
-    });
-
-    if (!error) {
-      alert("Collection logged! Awaiting Admin verification.");
-      setColFormData({ 
-        amount: "", 
-        mode: "Cash", 
-        ref: "", 
-        date: new Date().toISOString().split('T')[0] 
-      });
-      setIsDetailOpen(false);
-    }
-    setIsVerifying(false);
-  };
-
-  const acceptCollection = async (col) => {
-    setIsVerifying(true);
-    // 1. Mark as verified
-    const { error: colErr } = await supabase.from('collections').update({
-      status: 'verified',
-      verified_by: profile.id
-    }).eq('id', col.id);
-
-    if (!colErr) {
-      // 2. Reduce Customer balances
-      const newTBC = (parseFloat(col.customers.month_tbc) || 0) - col.amount;
-      const newTotal = (parseFloat(col.customers.loan_amount) || 0) - col.amount;
-      
-      await supabase.from('customers').update({
-        month_tbc: newTBC,
-        loan_amount: newTotal
-      }).eq('id', col.customer_id);
-
-      fetchData();
-    }
-    setIsVerifying(false);
-  };
-
-  const rejectCollection = async (colId) => {
-    await supabase.from('collections').update({ status: 'rejected' }).eq('id', colId);
-    fetchData();
+    if (!error) fetchHistory(selectedCustomer.id);
+    else alert("Clear failed: " + error.message);
   };
 
   const updateInstallmentDay = async (newDay) => {
@@ -389,6 +293,9 @@ function DashboardContent() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div className="gold-text" style={{ fontWeight: 800 }}>₹{(parseFloat(customer.month_tbc) || 0).toLocaleString('en-IN')}</div>
+                  {parseFloat(customer.month_tbc) === parseFloat(customer.loan_amount) && customer.month_tbc > 0 && (
+                    <div style={{ fontSize: '7px', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', marginTop: '2px' }}>Total Due Fallback</div>
+                  )}
                   <div style={{ fontSize: '8px', opacity: 0.6 }}>{isAdmin ? customer.assigned_executive : 'MY TBC'}</div>
                 </div>
               </div>
@@ -488,27 +395,6 @@ function DashboardContent() {
               <div style={{ marginBottom: '32px' }}>
                  <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '16px', textTransform: 'uppercase' }}>Total Audit Timeline</div>
                  
-                 {/* Payments First (Financial Criticality) */}
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-                    {customerCollections.map((c, i) => (
-                      <div key={`col-${i}`} style={{ padding: '12px', background: 'rgba(48, 209, 88, 0.05)', borderRadius: '12px', border: '1px solid rgba(48, 209, 88, 0.2)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div style={{ background: 'var(--success)', color: '#000', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Check size={10} />
-                              </div>
-                              <div style={{ fontSize: '13px', fontWeight: 900, color: 'var(--success)' }}>₹{c.amount.toLocaleString('en-IN')}</div>
-                           </div>
-                           <div style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 700 }}>VERIFIED RECEIPT</div>
-                        </div>
-                        <div style={{ fontSize: '10px', marginTop: '4px', opacity: 0.8 }}>
-                          Received via {c.payment_mode} • {new Date(c.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                        </div>
-                      </div>
-                    ))}
-                 </div>
-
-                 {/* Interaction status logs */}
                  <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', opacity: 0.6 }}>CALL STATUS & REMARKS</div>
                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'none' }}>
                     {['Promised', 'Busy', 'Switch Off', 'Wrong No'].map((quickRemark) => (
@@ -531,57 +417,6 @@ function DashboardContent() {
                       onKeyDown={(e) => e.key === 'Enter' && handleSaveInteraction()}
                     />
                  </div>
-              </div>
-
-               <div 
-                 id="log-collection-form"
-                 style={{ marginBottom: '32px', padding: '20px', background: 'rgba(197,160,89,0.03)', borderRadius: '20px', border: '1px solid rgba(197,160,89,0.2)' }}
-               >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                     <Save size={14} style={{ color: 'var(--primary)' }} />
-                     <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>Log Collection (Money Received)</div>
-                  </div>
-                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-                    <input 
-                      type="number" 
-                      placeholder="Amount (₹)" 
-                      value={colFormData.amount} 
-                      onChange={e => setColFormData({...colFormData, amount: e.target.value})}
-                      style={{ background: '#141415' }}
-                    />
-                    <select 
-                      value={colFormData.mode} 
-                      onChange={e => setColFormData({...colFormData, mode: e.target.value})}
-                      style={{ background: '#141415', color: '#FFF' }}
-                    >
-                      <option value="Cash">Cash</option>
-                      <option value="UPI">UPI</option>
-                      <option value="Bank">Bank Transfer</option>
-                    </select>
-                 </div>
-                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px', marginBottom: '12px' }}>
-                    <div style={{ fontSize: '9px', color: 'var(--text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>Payment Date</div>
-                    <input 
-                      type="date" 
-                      value={colFormData.date} 
-                      onChange={e => setColFormData({...colFormData, date: e.target.value})}
-                      style={{ background: '#141415' }}
-                    />
-                 </div>
-                 <input 
-                    placeholder="Reference No. (Optional)" 
-                    value={colFormData.ref} 
-                    onChange={e => setColFormData({...colFormData, ref: e.target.value})}
-                    style={{ background: '#141415', marginBottom: '12px' }}
-                 />
-                 <button 
-                  disabled={isVerifying}
-                  onClick={handleLogCollection}
-                  className="btn btn-primary" 
-                  style={{ width: '100%', padding: '12px', fontSize: '11px' }}
-                 >
-                   {isVerifying ? 'Logging...' : 'SUBMIT COLLECTION'}
-                 </button>
               </div>
 
               <div>

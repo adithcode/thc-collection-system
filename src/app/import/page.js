@@ -62,7 +62,7 @@ export default function ImportPage() {
     { key: "due_date", label: "Last Due Date", required: true },
     { key: "loan_amount", label: "Total Due", required: true },
     { key: "installment_day", label: "Install Day (Date)", required: false },
-    { key: "current_status", label: "Status", required: false },
+    { key: "status", label: "Status", required: false },
   ];
 
   const handleFileUpload = (e) => {
@@ -96,12 +96,13 @@ export default function ImportPage() {
             const lowL = f.label.toLowerCase();
             return lowH === lowL || 
                    lowH === f.key.toLowerCase() ||
-                   (f.key === 'loan_no' && lowH.includes('agreement')) ||
-                   (f.key === 'month_tbc' && (lowH === 'month' || lowH.includes('tbc') || lowH.includes('to be collected'))) ||
-                   (f.key === 'loan_amount' && (lowH.includes('total due') || lowH.includes('total dues'))) ||
-                   (f.key === 'assigned_executive' && lowH.includes('executive')) ||
-                   (f.key === 'phone' && (lowH.includes('phone') || lowH.includes('mobile') || lowH.includes('contact'))) ||
-                   (f.key === 'installment_day' && lowH.includes('inst. date'));
+                    (f.key === 'loan_no' && lowH.includes('agreement')) ||
+                    (f.key === 'name' && (lowH === 'customer' || lowH.includes('customer'))) ||
+                    (f.key === 'month_tbc' && (lowH === 'month' || lowH.includes('tbc') || lowH.includes('to be collected'))) ||
+                    (f.key === 'loan_amount' && (lowH.includes('total due') || lowH.includes('total dues') || lowH.includes('balance'))) ||
+                    (f.key === 'assigned_executive' && (lowH.includes('executive') || lowH.includes('agent'))) ||
+                    (f.key === 'phone' && (lowH.includes('phone') || lowH.includes('mobile') || lowH.includes('contact'))) ||
+                    (f.key === 'installment_day' && (lowH.includes('inst. date') || lowH.includes('installment date')));
           });
           if (match) autoMap[f.key] = match;
         });
