@@ -243,19 +243,21 @@ function DashboardContent() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          <div>
-            <div className="gold-text" style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>
-              ₹{totalMonthlyTBC.toLocaleString('en-IN')}
-            </div>
-            <div style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 700 }}>MONTHLY TARGET</div>
-          </div>
           {isAdmin && (
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '24px', fontWeight: 800, color: '#FFF', letterSpacing: '-0.02em' }}>
-                ₹{totalPoolOS.toLocaleString('en-IN')}
+            <>
+              <div>
+                <div className="gold-text" style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>
+                  ₹{totalMonthlyTBC.toLocaleString('en-IN')}
+                </div>
+                <div style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 700 }}>MONTHLY TARGET (ALL)</div>
               </div>
-              <div style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 700 }}>TOTAL PORTFOLIO O/S</div>
-            </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '24px', fontWeight: 800, color: '#FFF', letterSpacing: '-0.02em' }}>
+                  ₹{totalPoolOS.toLocaleString('en-IN')}
+                </div>
+                <div style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 700 }}>TOTAL PORTFOLIO O/S</div>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -376,7 +378,12 @@ function DashboardContent() {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div className="gold-text" style={{ fontWeight: 800 }}>₹{(parseFloat(customer.month_tbc) || 0).toLocaleString('en-IN')}</div>
+                  <div className="gold-text" style={{ fontWeight: 800, fontSize: '15px' }}>
+                    ₹{(parseFloat(customer.month_tbc) || 0).toLocaleString('en-IN')}
+                    <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontWeight: 400, marginLeft: '4px' }}>
+                      / ₹{parseFloat(customer.loan_amount).toLocaleString('en-IN')}
+                    </span>
+                  </div>
                   {parseFloat(customer.month_tbc) === parseFloat(customer.loan_amount) && customer.month_tbc > 0 && (
                     <div style={{ fontSize: '7px', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', marginTop: '2px' }}>Total Due Fallback</div>
                    )}
@@ -448,11 +455,9 @@ function DashboardContent() {
                     <p style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Database size={12} /> {selectedCustomer.loan_no}
                     </p>
-                    {isAdmin && (
-                      <p style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 800 }}>
-                        Balance: ₹{parseFloat(selectedCustomer.loan_amount).toLocaleString('en-IN')}
-                      </p>
-                    )}
+                    <p style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 800 }}>
+                      Total Due: ₹{parseFloat(selectedCustomer.loan_amount || 0).toLocaleString('en-IN')}
+                    </p>
                   </div>
                 </div>
                  <div style={{ display: 'flex', gap: '8px' }}>
