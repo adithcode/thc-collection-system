@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
 import Navigation from "@/components/Navigation";
 import SplashScreen from "@/components/SplashScreen";
+import AuthShield from "@/components/AuthShield";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 
@@ -48,12 +49,12 @@ export default function RootLayout({ children }) {
         {isLoading && isHome ? (
           <SplashScreen finishLoading={() => setIsLoading(false)} />
         ) : (
-          <>
+          <AuthShield>
             <Navigation />
             <main style={{ paddingBottom: '100px' }}>
               {children}
             </main>
-          </>
+          </AuthShield>
         )}
       </body>
     </html>
