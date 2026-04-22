@@ -205,6 +205,13 @@ function DashboardContent() {
   const totalMonthlyTBC = displayCustomers.reduce((acc, c) => acc + (parseFloat(c.month_tbc) || 0), 0);
   const totalPoolOS = displayCustomers.reduce((acc, c) => acc + (parseFloat(c.loan_amount) || 0), 0);
 
+  // Performance Scorecard Metrics
+  const statsCustomers = selectedExec === 'ALL AGENTS' ? customers : customers.filter(c => c.assigned_executive === selectedExec);
+  const totalAssigned = statsCustomers.length;
+  const paidCount = statsCustomers.filter(c => c.is_paid || (parseFloat(c.month_tbc) === 0)).length;
+  const pendingCount = totalAssigned - paidCount;
+  const performanceScore = totalAssigned > 0 ? Math.round((paidCount / totalAssigned) * 100) : 0;
+
   return (
     <div className="container safe-bottom">
       <div style={{ padding: '24px 0', borderBottom: '1px solid var(--border)', marginBottom: '32px' }}>
@@ -259,6 +266,49 @@ function DashboardContent() {
               </div>
             </>
           )}
+        </div>
+
+        {/* Actionable Performance Scorecard */}
+        <div style={{ marginTop: '24px', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Performance Overview {selectedExec !== 'ALL AGENTS' ? `• ${selectedExec}` : ''}
+            </div>
+            <div style={{ 
+              background: performanceScore >= 80 ? 'rgba(48,209,88,0.1)' : performanceScore >= 50 ? 'rgba(197,160,89,0.1)' : 'rgba(255,59,48,0.1)', 
+              color: performanceScore >= 80 ? '#30D158' : performanceScore >= 50 ? 'var(--primary)' : '#FF3B30', 
+              padding: '4px 10px', borderRadius: '100px', fontSize: '10px', fontWeight: 900 
+            }}>
+              {performanceScore}% EFFICIENCY
+            </div>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#FFF' }}>{totalAssigned}</div>
+              <div style={{ fontSize: '8px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>Assigned</div>
+            </div>
+            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#30D158' }}>{paidCount}</div>
+              <div style={{ fontSize: '8px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>Paid</div>
+            </div>
+            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '14px', border: '1px solid rgba(255,255,10,0.05)' }}>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: pendingCount > 0 ? 'var(--primary)' : 'var(--text-dim)' }}>{pendingCount}</div>
+              <div style={{ fontSize: '8px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>Pending</div>
+            </div>
+          </div>
+
+          <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', marginTop: '16px', overflow: 'hidden' }}>
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${performanceScore}%` }}
+              style={{ 
+                height: '100%', 
+                background: performanceScore >= 80 ? '#30D158' : performanceScore >= 50 ? 'var(--primary)' : '#FF3B30',
+                boxShadow: performanceScore >= 50 ? '0 0 10px rgba(197,160,89,0.3)' : 'none'
+              }} 
+            />
+          </div>
         </div>
       </div>
 
