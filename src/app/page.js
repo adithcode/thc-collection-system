@@ -378,6 +378,10 @@ function DashboardContent() {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginBottom: '2px', opacity: 0.5, fontSize: '7px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <span>TBC</span>
+                    <span>Total Due</span>
+                  </div>
                   <div className="gold-text" style={{ fontWeight: 800, fontSize: '15px' }}>
                     ₹{(parseFloat(customer.month_tbc) || 0).toLocaleString('en-IN')}
                     <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontWeight: 400, marginLeft: '4px' }}>
