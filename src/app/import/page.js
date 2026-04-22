@@ -162,6 +162,8 @@ export default function ImportPage() {
 
     if (!entry.month_tbc || entry.month_tbc === 0) {
         entry.month_tbc = entry.loan_amount || 0;
+    } else if (entry.month_tbc > entry.loan_amount) {
+        entry.month_tbc = entry.loan_amount;
     }
 
     // Relaxed inclusion: if a name exists, we import it even if balance is 0

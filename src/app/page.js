@@ -433,7 +433,7 @@ function DashboardContent() {
                     <span>Total Due</span>
                   </div>
                   <div className="gold-text" style={{ fontWeight: 800, fontSize: '15px' }}>
-                    ₹{(parseFloat(customer.month_tbc) || 0).toLocaleString('en-IN')}
+                    ₹{Math.min(parseFloat(customer.month_tbc) || 0, parseFloat(customer.loan_amount) || Infinity).toLocaleString('en-IN')}
                     <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontWeight: 400, marginLeft: '4px' }}>
                       / ₹{parseFloat(customer.loan_amount).toLocaleString('en-IN')}
                     </span>
