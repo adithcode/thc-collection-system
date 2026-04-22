@@ -30,6 +30,9 @@ function DashboardContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [filter, setFilter] = useState("All");
   const [selectedExec, setSelectedExec] = useState("ALL AGENTS");
+  const [activeTab, setActiveTab] = useState("All");
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [newPhone, setNewPhone] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -133,6 +136,47 @@ function DashboardContent() {
     }
   };
 
+  const handleUpdatePhone = async () => {
+    if (!newPhone.trim() || newPhone === selectedCustomer.phone) {
+      setIsEditingPhone(false);
+      return;
+    }
+    
+    const { error } = await supabase.from('customers').update({ phone: newPhone }).eq('id', selectedCustomer.id);
+    if (!error) {
+      // Log the change permanently
+      await supabase.from('interactions').insert({
+        customer_id: selectedCustomer.id,
+        agent_id: profile.id,
+        remark: `PHONE UPDATED: Changed from ${selectedCustomer.phone} to ${newPhone}`,
+        type: 'Call'
+      });
+      
+      setSelectedCustomer(prev => ({...prev, phone: newPhone}));
+      setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? {...c, phone: newPhone} : c));
+      fetchHistory(selectedCustomer.id);
+      setIsEditingPhone(false);
+    } else {
+      alert("Update failed: " + error.message);
+    }
+  };
+
+  const handleToggleStatus = async (field) => {
+    const currentValue = selectedCustomer[field];
+    
+    // Security check for 'is_paid': Agents can set TO true, but only Admins can set TO false (undo)
+    if (field === 'is_paid' && currentValue === true && !isAdmin) {
+      alert("Permission Denied: Only administrators can unmark a customer as Paid.");
+      return;
+    }
+
+    const { error } = await supabase.from('customers').update({ [field]: !currentValue }).eq('id', selectedCustomer.id);
+    if (!error) {
+       setSelectedCustomer(prev => ({...prev, [field]: !currentValue}));
+       setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? {...c, [field]: !currentValue} : c));
+    }
+  };
+
   const filteredCustomers = customers.filter(c => {
     const isDueToday = c.installment_day === currentDayOfMonth;
     const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -140,7 +184,15 @@ function DashboardContent() {
     const matchesExec = selectedExec === 'ALL AGENTS' || c.assigned_executive === selectedExec;
     const matchesDailyFilter = filter === 'All' || isDueToday;
     
-    return matchesSearch && matchesExec && matchesDailyFilter;
+    // Status Filter Logic
+    const isPaidComputed = c.is_paid || (parseFloat(c.month_tbc) === 0);
+    const matchesStatus = 
+        activeTab === "All" || 
+        (activeTab === "Paid" && isPaidComputed) ||
+        (activeTab === "Priority" && c.is_priority) ||
+        (activeTab === "Pending" && !isPaidComputed);
+    
+    return matchesSearch && matchesExec && matchesDailyFilter && matchesStatus;
   });
 
   const uniqueExecs = Array.from(new Set(customers.map(c => c.assigned_executive).filter(Boolean))).sort();
@@ -253,6 +305,30 @@ function DashboardContent() {
         </div>
       )}
 
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+           {["All", "Priority", "Pending", "Paid"].map(t => (
+             <button
+               key={t}
+               onClick={() => setActiveTab(t)}
+               style={{
+                 whiteSpace: 'nowrap',
+                 padding: '8px 20px',
+                 borderRadius: '100px',
+                 fontSize: '11px',
+                 fontWeight: 800,
+                 background: activeTab === t ? (t === 'Priority' ? 'rgba(255,59,48,0.1)' : 'rgba(255,255,255,0.08)') : 'transparent',
+                 color: activeTab === t ? (t === 'Priority' ? '#FF3B30' : 'var(--primary)') : 'var(--text-dim)',
+                 border: activeTab === t ? `1px solid ${t === 'Priority' ? '#FF3B30' : 'var(--primary)'}` : '1px solid var(--border)',
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               {t.toUpperCase()}
+             </button>
+           ))}
+        </div>
+      </div>
+
       <div style={{ position: 'relative', marginBottom: '20px' }}>
         <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
         <input type="text" placeholder="Search my workload..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ paddingLeft: '40px', background: '#141415' }} />
@@ -279,8 +355,16 @@ function DashboardContent() {
               >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ fontWeight: 700, fontSize: '14px' }}>{customer.name}</div>
+                    {customer.is_priority && (
+                      <div style={{ background: 'rgba(255,59,48,0.1)', color: '#FF3B30', padding: '2px 6px', borderRadius: '4px', fontSize: '8px', fontWeight: 900 }}>PRIORITY</div>
+                    )}
+                    {(customer.is_paid || parseFloat(customer.month_tbc) === 0) && (
+                      <div style={{ background: 'rgba(48,209,88,0.1)', color: '#30D158', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 6px', borderRadius: '4px', fontSize: '8px', fontWeight: 900 }}>
+                        <Check size={8} /> PAID
+                      </div>
+                    )}
                     {isDueToday && (
                       <span style={{ background: 'var(--primary)', color: '#000', fontSize: '8px', padding: '2px 6px', borderRadius: '4px', fontWeight: 900, textTransform: 'uppercase' }}>
                         DUE TODAY
@@ -295,8 +379,8 @@ function DashboardContent() {
                   <div className="gold-text" style={{ fontWeight: 800 }}>₹{(parseFloat(customer.month_tbc) || 0).toLocaleString('en-IN')}</div>
                   {parseFloat(customer.month_tbc) === parseFloat(customer.loan_amount) && customer.month_tbc > 0 && (
                     <div style={{ fontSize: '7px', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', marginTop: '2px' }}>Total Due Fallback</div>
-                  )}
-                  <div style={{ fontSize: '8px', opacity: 0.6 }}>{isAdmin ? customer.assigned_executive : 'MY TBC'}</div>
+                   )}
+                  <div style={{ fontSize: '8px', opacity: 0.6 }}>{isAdmin ? customer.assigned_executive : 'MONTHLY TARGET'}</div>
                 </div>
               </div>
             </div>
@@ -360,9 +444,16 @@ function DashboardContent() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
                 <div>
                   <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '4px' }}>{selectedCustomer.name}</h2>
-                  <p style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Database size={12} /> {selectedCustomer.loan_no}
-                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Database size={12} /> {selectedCustomer.loan_no}
+                    </p>
+                    {isAdmin && (
+                      <p style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 800 }}>
+                        Balance: ₹{parseFloat(selectedCustomer.loan_amount).toLocaleString('en-IN')}
+                      </p>
+                    )}
+                  </div>
                 </div>
                  <div style={{ display: 'flex', gap: '8px' }}>
                     <button 
@@ -378,22 +469,77 @@ function DashboardContent() {
                     </button>
                     <button 
                       onClick={() => {
-                        const phone = selectedCustomer.phone;
-                        if (phone) {
-                          navigator.clipboard.writeText(phone);
-                          alert("Number copied! You can now paste it in your dialer.");
-                        }
+                        setIsEditingPhone(!isEditingPhone);
+                        setNewPhone(selectedCustomer.phone || "");
                       }}
                       className="btn-icon" 
                       style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-dim)', padding: '12px', borderRadius: '14px', border: '1px solid var(--border)' }}
                     >
-                      <ClipboardList size={18} />
+                      <Edit2 size={18} />
                     </button>
                  </div>
               </div>
 
+              {isEditingPhone && (
+                <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>Edit Phone Number</div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input 
+                      value={newPhone} 
+                      onChange={e => setNewPhone(e.target.value)}
+                      placeholder="Enter new phone number"
+                      style={{ flex: 1, background: '#000' }}
+                    />
+                    <button onClick={handleUpdatePhone} className="btn-primary" style={{ padding: '0 16px' }}>Save</button>
+                    <button onClick={() => setIsEditingPhone(false)} style={{ padding: '0 16px', background: 'transparent', border: '1px solid var(--border)', color: '#FFF', borderRadius: '12px' }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '32px' }}>
+                 <button 
+                    onClick={() => handleToggleStatus('is_priority')}
+                    style={{ 
+                      padding: '16px', 
+                      borderRadius: '16px', 
+                      border: '1px solid',
+                      borderColor: selectedCustomer.is_priority ? '#FF3B30' : 'var(--border)',
+                      background: selectedCustomer.is_priority ? 'rgba(255,59,48,0.1)' : 'transparent',
+                      color: selectedCustomer.is_priority ? '#FF3B30' : 'var(--text-dim)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                 >
+                    <AlertCircle size={18} />
+                    <span style={{ fontSize: '10px', fontWeight: 800 }}>{selectedCustomer.is_priority ? 'REMOVE PRIORITY' : 'MARK PRIORITY'}</span>
+                 </button>
+
+                 <button 
+                    onClick={() => handleToggleStatus('is_paid')}
+                    style={{ 
+                      padding: '16px', 
+                      borderRadius: '16px', 
+                      border: '1px solid',
+                      borderColor: (selectedCustomer.is_paid || parseFloat(selectedCustomer.month_tbc) === 0) ? '#30D158' : 'var(--border)',
+                      background: (selectedCustomer.is_paid || parseFloat(selectedCustomer.month_tbc) === 0) ? 'rgba(48,209,88,0.1)' : 'transparent',
+                      color: (selectedCustomer.is_paid || parseFloat(selectedCustomer.month_tbc) === 0) ? '#30D158' : 'var(--text-dim)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                 >
+                    <ShieldCheck size={18} />
+                    <span style={{ fontSize: '10px', fontWeight: 800 }}>
+                      {(selectedCustomer.is_paid || parseFloat(selectedCustomer.month_tbc) === 0) ? 'MARK AS UNPAID' : 'MARK AS PAID'}
+                    </span>
+                 </button>
+              </div>
+
               <div style={{ marginBottom: '32px' }}>
-                 <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '16px', textTransform: 'uppercase' }}>Total Audit Timeline</div>
+                 <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '16px', textTransform: 'uppercase' }}>Interaction & Audit Logs</div>
                  
                  <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', opacity: 0.6 }}>CALL STATUS & REMARKS</div>
                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'none' }}>

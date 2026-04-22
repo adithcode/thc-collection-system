@@ -13,6 +13,8 @@ CREATE TABLE customers (
   due_date DATE NOT NULL,
   installment_day INTEGER,
   status TEXT DEFAULT 'Due',
+  is_paid BOOLEAN DEFAULT false,
+  is_priority BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

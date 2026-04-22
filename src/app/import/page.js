@@ -171,6 +171,10 @@ export default function ImportPage() {
         entry.installment_day = new Date(entry.due_date).getDate();
     }
 
+    // Initialize new status flags
+    entry.is_paid = (parseFloat(entry.month_tbc) === 0);
+    entry.is_priority = false;
+
     entry.phone = entry.phone || 'NA';
     return entry;
   };
