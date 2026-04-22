@@ -249,20 +249,20 @@ function DashboardContent() {
            </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           {isAdmin && (
             <>
               <div>
-                <div className="gold-text" style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>
+                <div className="gold-text" style={{ fontSize: 'clamp(18px, 5vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
                   ₹{totalMonthlyTBC.toLocaleString('en-IN')}
                 </div>
-                <div style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 700 }}>MONTHLY TARGET (ALL)</div>
+                <div style={{ fontSize: '8px', color: 'var(--text-dim)', fontWeight: 700 }}>MONTHLY TARGET (ALL)</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '24px', fontWeight: 800, color: '#FFF', letterSpacing: '-0.02em' }}>
+                <div style={{ fontSize: 'clamp(18px, 5vw, 24px)', fontWeight: 800, color: '#FFF', letterSpacing: '-0.02em' }}>
                   ₹{totalPoolOS.toLocaleString('en-IN')}
                 </div>
-                <div style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 700 }}>TOTAL PORTFOLIO O/S</div>
+                <div style={{ fontSize: '8px', color: 'var(--text-dim)', fontWeight: 700 }}>TOTAL PORTFOLIO O/S</div>
               </div>
             </>
           )}
@@ -283,18 +283,18 @@ function DashboardContent() {
             </div>
           </div>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: '#FFF' }}>{totalAssigned}</div>
-              <div style={{ fontSize: '8px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>Assigned</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+            <div style={{ padding: '12px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: '#FFF' }}>{totalAssigned}</div>
+              <div style={{ fontSize: '7px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>Assigned</div>
             </div>
-            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: '#30D158' }}>{paidCount}</div>
-              <div style={{ fontSize: '8px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>Paid</div>
+            <div style={{ padding: '12px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: '#30D158' }}>{paidCount}</div>
+              <div style={{ fontSize: '7px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>Paid</div>
             </div>
-            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '14px', border: '1px solid rgba(255,255,10,0.05)' }}>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: pendingCount > 0 ? 'var(--primary)' : 'var(--text-dim)' }}>{pendingCount}</div>
-              <div style={{ fontSize: '8px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>Pending</div>
+            <div style={{ padding: '12px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '14px', border: '1px solid rgba(255,255,10,0.05)' }}>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: pendingCount > 0 ? 'var(--primary)' : 'var(--text-dim)' }}>{pendingCount}</div>
+              <div style={{ fontSize: '7px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>Pending</div>
             </div>
           </div>
 
@@ -358,6 +358,45 @@ function DashboardContent() {
       )}
 
       <div style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+           <button 
+             onClick={() => setFilter('All')}
+             style={{ 
+               padding: '10px 20px', 
+               borderRadius: '100px', 
+               fontSize: '11px', 
+               fontWeight: 900, 
+               background: filter === 'All' ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
+               color: filter === 'All' ? '#000' : 'var(--text-dim)',
+               border: filter === 'All' ? 'none' : '1px solid var(--border)',
+               display: 'flex',
+               alignItems: 'center',
+               gap: '8px',
+               whiteSpace: 'nowrap'
+             }}
+           >
+             ALL COLLECTION
+           </button>
+           <button 
+             onClick={() => setFilter('Due Today')}
+             style={{ 
+               padding: '10px 20px', 
+               borderRadius: '100px', 
+               fontSize: '11px', 
+               fontWeight: 900, 
+               background: filter === 'Due Today' ? 'var(--primary)' : 'rgba(197,160,89,0.05)',
+               color: filter === 'Due Today' ? '#000' : 'var(--primary)',
+               border: filter === 'Due Today' ? 'none' : '1px solid var(--border)',
+               display: 'flex',
+               alignItems: 'center',
+               gap: '8px',
+               whiteSpace: 'nowrap'
+             }}
+           >
+             <Clock size={14} /> DUE TODAY
+           </button>
+        </div>
+
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none' }}>
            {["All", "Priority", "Pending", "Paid"].map(t => (
              <button

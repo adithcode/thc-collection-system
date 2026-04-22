@@ -22,11 +22,16 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-  height: 100%;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
   width: 100%;
   overflow-x: hidden;
-  overscroll-behavior-y: none; /* Hard-lock pull-to-refresh */
+  overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
+}
+
+html {
+  height: -webkit-fill-available;
 }
 
 /* Typography Hierarchy */
@@ -118,9 +123,9 @@ input[type="date"] {
 /* Layout Utilities */
 .container {
   width: 100%;
-  max-width: 500px; /* Tighter for professional feel */
+  max-width: 500px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 16px 12px; /* Reduced for 720p/small screens */
 }
 
 .safe-bottom {
