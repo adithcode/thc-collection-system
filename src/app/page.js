@@ -33,6 +33,14 @@ function DashboardContent() {
   const [activeTab, setActiveTab] = useState("All");
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [newPhone, setNewPhone] = useState("");
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    handleResize(); // Initial check
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -212,6 +220,32 @@ function DashboardContent() {
   const pendingCount = totalAssigned - paidCount;
   const performanceScore = totalAssigned > 0 ? Math.round((paidCount / totalAssigned) * 100) : 0;
 
+  const props = {
+    isAdmin, profile, formattedDate, loading, fetchData, supabase, router,
+    totalMonthlyTBC, totalPoolOS, performanceScore, totalAssigned, paidCount, pendingCount,
+    uniqueExecs, selectedExec, setSelectedExec, filter, setFilter,
+    activeTab, setActiveTab, searchTerm, setSearchTerm, displayCustomers,
+    setSelectedCustomer, setIsDetailOpen, fetchHistory, isDetailOpen, selectedCustomer,
+    currentDayOfMonth, updateInstallmentDay, isEditingPhone, setIsEditingPhone,
+    newPhone, setNewPhone, handleUpdatePhone, handleToggleStatus,
+    remark, setRemark, handleSaveInteraction, isSaving, history, handleClearHistory
+  };
+
+  return isDesktop ? <DesktopView {...props} /> : <MobileView {...props} />;
+}
+
+// --- VIEW COMPONENTS ---
+
+function MobileView({
+  isAdmin, profile, formattedDate, loading, fetchData, supabase, router,
+  totalMonthlyTBC, totalPoolOS, performanceScore, totalAssigned, paidCount, pendingCount,
+  uniqueExecs, selectedExec, setSelectedExec, filter, setFilter,
+  activeTab, setActiveTab, searchTerm, setSearchTerm, displayCustomers,
+  setSelectedCustomer, setIsDetailOpen, fetchHistory, isDetailOpen, selectedCustomer,
+  currentDayOfMonth, updateInstallmentDay, isEditingPhone, setIsEditingPhone,
+  newPhone, setNewPhone, handleUpdatePhone, handleToggleStatus,
+  remark, setRemark, handleSaveInteraction, isSaving, history, handleClearHistory
+}) {
   return (
     <div className="container safe-bottom">
       <div style={{ padding: '24px 0', borderBottom: '1px solid var(--border)', marginBottom: '32px' }}>
@@ -641,7 +675,7 @@ function DashboardContent() {
                  
                  <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', opacity: 0.6 }}>CALL STATUS & REMARKS</div>
                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'none' }}>
-                    {['Promised', 'Busy', 'Switch Off', 'Wrong No'].map((quickRemark) => (
+                    {quickRemarks.map((quickRemark) => (
                       <button 
                         key={quickRemark}
                         onClick={() => handleSaveInteraction(quickRemark)}
@@ -701,6 +735,362 @@ function DashboardContent() {
           </>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+const quickRemarks = ['Promised', 'Busy', 'Switch Off', 'Wrong No'];
+
+function DesktopView(props) {
+  const { 
+    isAdmin, profile, formattedDate, loading, fetchData, supabase,
+    totalMonthlyTBC, totalPoolOS, performanceScore, totalAssigned, paidCount, pendingCount,
+    uniqueExecs, selectedExec, setSelectedExec, filter, setFilter,
+    activeTab, setActiveTab, searchTerm, setSearchTerm, displayCustomers,
+    setSelectedCustomer, setIsDetailOpen, fetchHistory, isDetailOpen, selectedCustomer,
+    currentDayOfMonth, updateInstallmentDay, isEditingPhone, setIsEditingPhone,
+    newPhone, setNewPhone, handleUpdatePhone, handleToggleStatus,
+    remark, setRemark, handleSaveInteraction, isSaving, history, handleClearHistory
+  } = props;
+
+  return (
+    <div style={{ display: 'flex', width: '100vw', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
+      {/* SIDEBAR: Customer List */}
+      <div style={{ 
+        width: '400px', 
+        borderRight: '1px solid var(--border)', 
+        display: 'flex', 
+        flexDirection: 'column',
+        background: 'rgba(20, 20, 21, 0.5)',
+        backdropFilter: 'blur(20px)'
+      }}>
+        <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h1 style={{ fontSize: '18px', fontWeight: 900, letterSpacing: '-0.02em' }}>
+              THC <span className="gold-text">GROUP</span>
+            </h1>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                onClick={() => fetchData()} 
+                className="btn-icon" 
+                style={{ padding: '8px', background: 'rgba(197,160,89,0.1)', color: 'var(--primary)', borderRadius: '10px' }}
+              >
+                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+              </button>
+            </div>
+          </div>
+
+          <div style={{ position: 'relative', marginBottom: '16px' }}>
+            <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+            <input 
+              type="text" 
+              placeholder="Search workload..." 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+              style={{ paddingLeft: '36px', fontSize: '13px', height: '40px', background: '#000' }} 
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+             <div style={{ display: 'flex', gap: '4px' }}>
+                {['All', 'Due Today'].map(f => (
+                  <button 
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    style={{ 
+                      flex: 1, padding: '8px', fontSize: '10px', fontWeight: 800, borderRadius: '8px',
+                      background: filter === f ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
+                      color: filter === f ? '#000' : 'var(--text-dim)',
+                      border: filter === f ? 'none' : '1px solid var(--border)',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {f.toUpperCase()}
+                  </button>
+                ))}
+             </div>
+             
+             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px' }}>
+                {["All", "Priority", "Pending", "Paid"].map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setActiveTab(t)}
+                    style={{
+                      padding: '8px 0', borderRadius: '8px', fontSize: '9px', fontWeight: 800,
+                      background: activeTab === t ? (t === 'Priority' ? 'rgba(255,59,48,0.1)' : 'rgba(255,255,255,0.08)') : 'transparent',
+                      color: activeTab === t ? (t === 'Priority' ? '#FF3B30' : 'var(--primary)') : 'var(--text-dim)',
+                      border: activeTab === t ? `1px solid ${t === 'Priority' ? '#FF3B30' : 'var(--primary)'}` : '1px solid var(--border)',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {t.toUpperCase()}
+                  </button>
+                ))}
+             </div>
+          </div>
+        </div>
+
+        <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {displayCustomers.map((customer) => {
+              const isDueToday = customer.installment_day === currentDayOfMonth;
+              const isSelected = selectedCustomer?.id === customer.id;
+              const isPaid = customer.is_paid || (parseFloat(customer.month_tbc) === 0);
+
+              return (
+                <div 
+                  key={customer.id} 
+                  onClick={() => { setSelectedCustomer(customer); fetchHistory(customer.id); }}
+                  className="card"
+                  style={{ 
+                    padding: '16px', 
+                    cursor: 'pointer',
+                    borderColor: isSelected ? 'var(--primary)' : 'var(--border)',
+                    background: isSelected ? 'rgba(197,160,89,0.05)' : 'var(--card-bg)',
+                    borderLeft: isDueToday ? '4px solid var(--primary)' : (isSelected ? '1px solid var(--primary)' : '1px solid var(--border)'),
+                    opacity: isPaid && !isSelected ? 0.6 : 1
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700 }}>{customer.name}</div>
+                    <div className="gold-text" style={{ fontSize: '14px', fontWeight: 900 }}>
+                      ₹{parseFloat(customer.month_tbc).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.5, fontSize: '11px', fontWeight: 600 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                       {isPaid ? <Check size={10} color="#30D158" /> : <Clock size={10} />}
+                       {customer.loan_no}
+                    </span>
+                    <span>DAY {customer.installment_day}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        
+        <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', fontSize: '11px', color: 'var(--text-dim)', fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
+           <span>{profile?.full_name_excel || profile?.username}</span>
+           <span style={{ opacity: 0.5 }}>{formattedDate}</span>
+        </div>
+      </div>
+
+      {/* MAIN CONTENT: Detail Workspace */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#000' }}>
+        {/* Top Metric Bar */}
+        <div style={{ padding: '24px 48px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '60px', alignItems: 'center', background: 'var(--bg)' }}>
+          {isAdmin && (
+            <>
+              <div>
+                <div style={{ fontSize: '24px', fontWeight: 900 }} className="gold-text">₹{totalMonthlyTBC.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Target (Current View)</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '24px', fontWeight: 900 }}>₹{totalPoolOS.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Portfolio Balance</div>
+              </div>
+            </>
+          )}
+          <div style={{ flex: 1 }} />
+          <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
+             <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '16px', fontWeight: 900, color: performanceScore >= 80 ? '#30D158' : performanceScore >= 50 ? 'var(--primary)' : '#FF3B30' }}>
+                  {performanceScore}% EFFICIENCY
+                </div>
+                <div style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 800, textTransform: 'uppercase' }}>Performance Score</div>
+             </div>
+             <div style={{ width: '120px', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${performanceScore}%` }}
+                  style={{ height: '100%', background: performanceScore >= 80 ? '#30D158' : 'var(--primary)' }} 
+                />
+             </div>
+             <button 
+                onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
+                className="btn-icon"
+                style={{ background: 'rgba(255,59,48,0.1)', color: '#FF3B30', padding: '12px', borderRadius: '12px' }}
+             >
+                <LogOut size={18} />
+             </button>
+          </div>
+        </div>
+
+        {/* Workspace Body */}
+        <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '48px' }}>
+          {selectedCustomer ? (
+            <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '48px' }}>
+                <div>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
+                      <h2 style={{ fontSize: '42px', fontWeight: 900, letterSpacing: '-0.03em' }}>{selectedCustomer.name}</h2>
+                      {selectedCustomer.is_priority && (
+                        <div style={{ background: 'rgba(255,59,48,0.1)', color: '#FF3B30', padding: '6px 16px', borderRadius: '8px', fontSize: '11px', fontWeight: 900, border: '1px solid rgba(255,59,48,0.2)' }}>PRIORITY CASE</div>
+                      )}
+                   </div>
+                   <div style={{ display: 'flex', gap: '32px', color: 'var(--text-dim)', fontSize: '15px', fontWeight: 600 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Database size={18} /> {selectedCustomer.loan_no}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><UserIcon size={18} /> {selectedCustomer.assigned_executive}</span>
+                   </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '16px' }}>
+                   <button 
+                     onClick={() => {
+                        const phone = selectedCustomer.phone?.replace(/[^0-9+]/g, '');
+                        if (phone) window.location.href = `tel:${phone}`;
+                        else alert("No valid phone number.");
+                     }}
+                     className="btn-primary" 
+                     style={{ padding: '0 32px', height: '56px', borderRadius: '16px', fontSize: '15px' }}>
+                     <Phone size={20} /> CALL CUSTOMER
+                   </button>
+                   <button 
+                     onClick={() => { setIsEditingPhone(!isEditingPhone); setNewPhone(selectedCustomer.phone || ""); }}
+                     className="btn-outline" 
+                     style={{ width: '56px', height: '56px', borderRadius: '16px' }}>
+                     <Edit2 size={20} />
+                   </button>
+                </div>
+              </div>
+
+              {isEditingPhone && (
+                <div style={{ marginBottom: '40px', padding: '32px', background: 'rgba(197,160,89,0.05)', borderRadius: '24px', border: '1px solid var(--primary)' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--primary)', marginBottom: '16px', textTransform: 'uppercase' }}>Update Primary Contact</div>
+                  <div style={{ display: 'flex', gap: '16px' }}>
+                    <input 
+                      value={newPhone} 
+                      onChange={e => setNewPhone(e.target.value)}
+                      placeholder="+91 XXXXX XXXXX"
+                      style={{ flex: 1, height: '56px', background: '#000', fontSize: '18px', fontWeight: 700 }}
+                    />
+                    <button onClick={handleUpdatePhone} className="btn-primary" style={{ width: '160px' }}>SAVE CHANGES</button>
+                    <button onClick={() => setIsEditingPhone(false)} className="btn-outline">CANCEL</button>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px' }}>
+                 {/* Left Panel: Metrics & Audit */}
+                 <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '40px' }}>
+                       <div className="card" style={{ padding: '24px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>Monthly Target</div>
+                          <div style={{ fontSize: '32px', fontWeight: 900 }} className="gold-text">₹{parseFloat(selectedCustomer.month_tbc).toLocaleString('en-IN')}</div>
+                       </div>
+                       <div className="card" style={{ padding: '24px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>Total O/S</div>
+                          <div style={{ fontSize: '32px', fontWeight: 900 }}>₹{parseFloat(selectedCustomer.loan_amount).toLocaleString('en-IN')}</div>
+                       </div>
+                    </div>
+
+                    <div style={{ marginBottom: '40px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '20px', textTransform: 'uppercase' }}>Adjust Installment Day</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '8px' }}>
+                        {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                          <button
+                            key={day}
+                            onClick={() => updateInstallmentDay(day)}
+                            style={{
+                              height: '42px', borderRadius: '10px', fontSize: '13px', fontWeight: 900,
+                              background: selectedCustomer.installment_day === day ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
+                              color: selectedCustomer.installment_day === day ? '#000' : '#FFF',
+                              border: 'none', transition: 'all 0.2s ease', cursor: 'pointer'
+                            }}
+                          >
+                            {day}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                        <button 
+                          onClick={() => handleToggleStatus('is_priority')}
+                          className="btn-outline" 
+                          style={{ 
+                            height: '72px', borderRadius: '18px', fontSize: '13px',
+                            borderColor: selectedCustomer.is_priority ? '#FF3B30' : 'var(--border)',
+                            background: selectedCustomer.is_priority ? 'rgba(255,59,48,0.05)' : 'transparent',
+                            color: selectedCustomer.is_priority ? '#FF3B30' : '#FFF'
+                          }}>
+                          <AlertCircle size={22} /> {selectedCustomer.is_priority ? 'REMOVE URGENCY' : 'SET AS PRIORITY'}
+                        </button>
+                        <button 
+                          onClick={() => handleToggleStatus('is_paid')}
+                          className="btn-outline" 
+                          style={{ 
+                            height: '72px', borderRadius: '18px', fontSize: '13px',
+                            borderColor: (selectedCustomer.is_paid || parseFloat(selectedCustomer.month_tbc) === 0) ? '#30D158' : 'var(--border)',
+                            background: (selectedCustomer.is_paid || parseFloat(selectedCustomer.month_tbc) === 0) ? 'rgba(48,209,88,0.05)' : 'transparent',
+                            color: (selectedCustomer.is_paid || parseFloat(selectedCustomer.month_tbc) === 0) ? '#30D158' : '#FFF'
+                          }}>
+                          <ShieldCheck size={22} /> {(selectedCustomer.is_paid || parseFloat(selectedCustomer.month_tbc) === 0) ? 'MARK AS UNPAID' : 'MARK COMPLETED'}
+                        </button>
+                    </div>
+                 </div>
+
+                 {/* Right Panel: CRM & History */}
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+                    <div className="card" style={{ padding: '32px', borderRadius: '24px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '24px', textTransform: 'uppercase' }}>Log Interaction</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                        {quickRemarks.map(qr => (
+                          <button key={qr} onClick={() => handleSaveInteraction(qr)} className="btn-outline" style={{ fontSize: '13px', padding: '14px', borderRadius: '12px' }}>{qr}</button>
+                        ))}
+                      </div>
+                      <div style={{ position: 'relative' }}>
+                        <MessageSquare size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+                        <input 
+                          placeholder="Add detail remark and press Enter..." 
+                          value={remark} 
+                          onChange={e => setRemark(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && handleSaveInteraction()}
+                          style={{ paddingLeft: '48px', height: '56px', background: '#000', borderRadius: '14px' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                        <History size={16} className="gold-text" />
+                        <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Audit Trail & Interaction Logs</div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {history.map((h, i) => (
+                          <div key={i} style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', borderLeft: h.remark.includes('Promised') ? '4px solid var(--primary)' : '1px solid var(--border)' }}>
+                            <div style={{ fontSize: '16px', fontWeight: 700, color: '#FFF', marginBottom: '8px' }}>{h.remark}</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 600, opacity: 0.5 }}>
+                              <span style={{ color: 'var(--primary)' }}>{h.profiles?.full_name_excel || h.profiles?.username}</span>
+                              <span>{new Date(h.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                            </div>
+                          </div>
+                        ))}
+                        {history.length === 0 && (
+                           <div style={{ textAlign: 'center', padding: '40px', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', border: '1px dashed var(--border)', color: 'var(--text-dim)', fontSize: '13px' }}>
+                              No audit logs available for this customer.
+                           </div>
+                        )}
+                        {history.length > 0 && isAdmin && (
+                           <button onClick={handleClearHistory} style={{ marginTop: '16px', background: 'transparent', border: 'none', color: '#FF3B30', fontSize: '11px', fontWeight: 800, cursor: 'pointer', opacity: 0.5 }}>
+                              DANGEROUS: WIPE ALL LOGS
+                           </button>
+                        )}
+                      </div>
+                    </div>
+                 </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.15 }}>
+               <ClipboardList size={140} strokeWidth={0.5} />
+               <p style={{ fontSize: '24px', fontWeight: 800, marginTop: '32px', letterSpacing: '-0.02em' }}>SELECT A CUSTOMER TO START</p>
+               <p style={{ fontSize: '14px', marginTop: '8px' }}>Command Center Ready • Waiting for input</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
