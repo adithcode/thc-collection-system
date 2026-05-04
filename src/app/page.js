@@ -82,9 +82,15 @@ function DashboardContent() {
       let query = supabase.from('customers').select('*');
 
       if (!isMasterAdmin) {
-         const myIdentity = prof?.full_name_excel || prof?.username || "SECURE_LOCK";
-         if (myIdentity === "SECURE_LOCK") query = query.eq('id', '00000000-0000-0000-0000-000000000000');
-         else query = query.ilike('assigned_executive', `%${myIdentity}%`);
+         let myIdentity = (prof?.full_name_excel || prof?.username || "SECURE_LOCK").toLowerCase();
+         if (myIdentity === "secure_lock") {
+           query = query.eq('id', '00000000-0000-0000-0000-000000000000');
+         } else if (myIdentity.includes("babu today") || myIdentity.includes("deepa thc")) {
+           // Shared identity logic: Both see each other's cases
+           query = query.or(`assigned_executive.ilike.%babu today%,assigned_executive.ilike.%deepa thc%`);
+         } else {
+           query = query.ilike('assigned_executive', `%${myIdentity}%`);
+         }
       }
       
       const { data: custs } = await query.order('created_at', { ascending: false });
@@ -186,7 +192,7 @@ function DashboardContent() {
   };
 
   const filteredCustomers = customers.filter(c => {
-    const isDueToday = c.installment_day === currentDayOfMonth;
+    const isDueToday = Number(c.installment_day) === currentDayOfMonth;
     const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          c.loan_no?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesExec = selectedExec === 'ALL AGENTS' || c.assigned_executive === selectedExec;
@@ -211,18 +217,33 @@ function DashboardContent() {
 
   const displayCustomers = filteredCustomers;
   const totalMonthlyTBC = displayCustomers.reduce((acc, c) => acc + (parseFloat(c.month_tbc) || 0), 0);
-  const totalPoolOS = displayCustomers.reduce((acc, c) => acc + (parseFloat(c.loan_amount) || 0), 0);
+  const totalPoolOS = displayCustomers.reduce((acc, c) => acc + (parseFloat(c.loan_amount || 0) - parseFloat(c.total_paid || 0)), 0);
 
   // Performance Scorecard Metrics
-  const statsCustomers = selectedExec === 'ALL AGENTS' ? customers : customers.filter(c => c.assigned_executive === selectedExec);
+  const statsCustomers = selectedExec === 'ALL AGENTS' ? customers : customers.filter(c => {
+    const exec = c.assigned_executive?.toLowerCase() || "";
+    const selected = selectedExec.toLowerCase();
+    if (selected === "babu today" || selected === "deepa thc") {
+      return exec.includes("babu today") || exec.includes("deepa thc");
+    }
+    return exec === selected;
+  });
+
   const totalAssigned = statsCustomers.length;
-  const paidCount = statsCustomers.filter(c => c.is_paid || (parseFloat(c.month_tbc) === 0)).length;
+  const paidCount = statsCustomers.filter(c => c.is_paid || (parseFloat(c.month_collected) > 0) || (parseFloat(c.total_paid) > 0)).length;
   const pendingCount = totalAssigned - paidCount;
-  const performanceScore = totalAssigned > 0 ? Math.round((paidCount / totalAssigned) * 100) : 0;
+  const totalPoints = statsCustomers.reduce((acc, c) => acc + (parseFloat(c.points) || 0), 0);
+  
+  // User Formula: percentage = (point / total customers) * 100
+  const performanceScore = totalAssigned > 0 ? ((totalPoints / totalAssigned) * 100).toFixed(2) : 0;
+
+  const sumMonthTBC = statsCustomers.reduce((acc, c) => acc + (parseFloat(c.month_tbc) || 0), 0);
+  const sumMonthCollected = statsCustomers.reduce((acc, c) => acc + (parseFloat(c.month_collected) || 0), 0);
 
   const props = {
     isAdmin, profile, formattedDate, loading, fetchData, supabase, router,
-    totalMonthlyTBC, totalPoolOS, performanceScore, totalAssigned, paidCount, pendingCount,
+    totalMonthlyTBC, totalPoolOS, performanceScore, totalAssigned, paidCount, pendingCount, totalPoints,
+    sumMonthTBC, sumMonthCollected,
     uniqueExecs, selectedExec, setSelectedExec, filter, setFilter,
     activeTab, setActiveTab, searchTerm, setSearchTerm, displayCustomers,
     setSelectedCustomer, setIsDetailOpen, fetchHistory, isDetailOpen, selectedCustomer,
@@ -238,7 +259,8 @@ function DashboardContent() {
 
 function MobileView({
   isAdmin, profile, formattedDate, loading, fetchData, supabase, router,
-  totalMonthlyTBC, totalPoolOS, performanceScore, totalAssigned, paidCount, pendingCount,
+  totalMonthlyTBC, totalPoolOS, performanceScore, totalAssigned, paidCount, pendingCount, totalPoints,
+  sumMonthTBC, sumMonthCollected,
   uniqueExecs, selectedExec, setSelectedExec, filter, setFilter,
   activeTab, setActiveTab, searchTerm, setSearchTerm, displayCustomers,
   setSelectedCustomer, setIsDetailOpen, fetchHistory, isDetailOpen, selectedCustomer,
@@ -302,46 +324,29 @@ function MobileView({
           )}
         </div>
 
-        {/* Actionable Performance Scorecard */}
-        <div style={{ marginTop: '24px', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Performance Overview {selectedExec !== 'ALL AGENTS' ? `• ${selectedExec}` : ''}
-            </div>
-            <div style={{ 
-              background: performanceScore >= 80 ? 'rgba(48,209,88,0.1)' : performanceScore >= 50 ? 'rgba(197,160,89,0.1)' : 'rgba(255,59,48,0.1)', 
-              color: performanceScore >= 80 ? '#30D158' : performanceScore >= 50 ? 'var(--primary)' : '#FF3B30', 
-              padding: '4px 10px', borderRadius: '100px', fontSize: '10px', fontWeight: 900 
-            }}>
-              {performanceScore}% EFFICIENCY
-            </div>
+        {/* Actionable Performance Scorecard - Modernized */}
+        <div style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid var(--border)', textAlign: 'center' }}>
+            <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '4px' }}>TOTAL</div>
+            <div style={{ fontSize: '20px', fontWeight: 900 }}>{totalAssigned}</div>
           </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-            <div style={{ padding: '12px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize: '16px', fontWeight: 800, color: '#FFF' }}>{totalAssigned}</div>
-              <div style={{ fontSize: '7px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>Assigned</div>
-            </div>
-            <div style={{ padding: '12px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize: '16px', fontWeight: 800, color: '#30D158' }}>{paidCount}</div>
-              <div style={{ fontSize: '7px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>Paid</div>
-            </div>
-            <div style={{ padding: '12px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '14px', border: '1px solid rgba(255,255,10,0.05)' }}>
-              <div style={{ fontSize: '16px', fontWeight: 800, color: pendingCount > 0 ? 'var(--primary)' : 'var(--text-dim)' }}>{pendingCount}</div>
-              <div style={{ fontSize: '7px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>Pending</div>
-            </div>
+          <div style={{ background: 'rgba(48,209,88,0.1)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(48,209,88,0.2)', textAlign: 'center' }}>
+            <div style={{ fontSize: '9px', fontWeight: 800, color: '#30D158', marginBottom: '4px' }}>PAID</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: '#30D158' }}>{paidCount}</div>
           </div>
-
-          <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', marginTop: '16px', overflow: 'hidden' }}>
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: `${performanceScore}%` }}
-              style={{ 
-                height: '100%', 
-                background: performanceScore >= 80 ? '#30D158' : performanceScore >= 50 ? 'var(--primary)' : '#FF3B30',
-                boxShadow: performanceScore >= 50 ? '0 0 10px rgba(197,160,89,0.3)' : 'none'
-              }} 
-            />
+          <div style={{ background: 'rgba(255,59,48,0.1)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,59,48,0.2)', textAlign: 'center' }}>
+            <div style={{ fontSize: '9px', fontWeight: 800, color: '#FF3B30', marginBottom: '4px' }}>BALANCE</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: '#FF3B30' }}>{pendingCount}</div>
+          </div>
+        </div>
+        <div style={{ marginTop: '10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div style={{ background: 'rgba(197,160,89,0.05)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(197,160,89,0.2)', textAlign: 'center' }}>
+            <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--primary)', marginBottom: '4px' }}>POINT</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--primary)' }}>{totalPoints.toFixed(2)}</div>
+          </div>
+          <div style={{ background: 'var(--primary)', padding: '16px', borderRadius: '16px', textAlign: 'center' }}>
+            <div style={{ fontSize: '9px', fontWeight: 800, color: '#000', marginBottom: '4px' }}>PERCENTAGE</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: '#000' }}>{performanceScore}%</div>
           </div>
         </div>
       </div>
@@ -496,12 +501,21 @@ function MobileView({
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: '9px', color: 'var(--text-dim)', marginTop: '4px' }}>
-                     Day {customer.installment_day || '—'} • {customer.loan_no}
+                  <div style={{ fontSize: '9px', color: 'var(--text-dim)', marginTop: '4px', display: 'flex', gap: '8px' }}>
+                     <span>Day {customer.installment_day || '—'}</span>
+                     <span>•</span>
+                     <span>{customer.loan_no}</span>
+                     {customer.paid_percentage > 0 && (
+                       <>
+                         <span>•</span>
+                         <span className="gold-text" style={{ fontWeight: 800 }}>{customer.paid_percentage}% PAID</span>
+                       </>
+                     )}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginBottom: '2px', opacity: 0.5, fontSize: '7px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {customer.total_paid > 0 && <span style={{ color: '#30D158' }}>Paid: ₹{customer.total_paid.toLocaleString('en-IN')}</span>}
                     <span>TBC</span>
                     <span>Total Due</span>
                   </div>
@@ -578,12 +592,18 @@ function MobileView({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
                 <div>
                   <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '4px' }}>{selectedCustomer.name}</h2>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <p style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Database size={12} /> {selectedCustomer.loan_no}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', rowGap: '8px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '6px' }}>
+                      <Database size={10} /> {selectedCustomer.loan_no}
                     </p>
-                    <p style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 800 }}>
-                      Total Due: ₹{parseFloat(selectedCustomer.loan_amount || 0).toLocaleString('en-IN')}
+                    <p style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 800, background: 'rgba(197,160,89,0.1)', padding: '4px 8px', borderRadius: '6px' }}>
+                      Month TBC: ₹{parseFloat(selectedCustomer.month_tbc || 0).toLocaleString('en-IN')}
+                    </p>
+                    <p style={{ fontSize: '11px', color: '#30D158', fontWeight: 800, background: 'rgba(48,209,88,0.1)', padding: '4px 8px', borderRadius: '6px' }}>
+                      Collected: ₹{parseFloat(selectedCustomer.month_collected || 0).toLocaleString('en-IN')}
+                    </p>
+                    <p style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600, background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: '6px' }}>
+                      Points: {parseFloat(selectedCustomer.points || 0).toFixed(1)}
                     </p>
                   </div>
                 </div>
@@ -612,21 +632,59 @@ function MobileView({
                  </div>
               </div>
 
-              {isEditingPhone && (
-                <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>Edit Phone Number</div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input 
-                      value={newPhone} 
-                      onChange={e => setNewPhone(e.target.value)}
-                      placeholder="Enter new phone number"
-                      style={{ flex: 1, background: '#000' }}
-                    />
-                    <button onClick={handleUpdatePhone} className="btn-primary" style={{ padding: '0 16px' }}>Save</button>
-                    <button onClick={() => setIsEditingPhone(false)} style={{ padding: '0 16px', background: 'transparent', border: '1px solid var(--border)', color: '#FFF', borderRadius: '12px' }}>Cancel</button>
-                  </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
+                <div style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '8px', textTransform: 'uppercase' }}>Principle</div>
+                  <div style={{ fontSize: '18px', fontWeight: 900 }}>₹{parseFloat(selectedCustomer.principal || 0).toLocaleString('en-IN')}</div>
                 </div>
-              )}
+                <div style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '8px', textTransform: 'uppercase' }}>Status</div>
+                  <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--primary)' }}>{selectedCustomer.status || 'ACTIVE'}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
+                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>Executive</div>
+                  <div style={{ fontSize: '14px', fontWeight: 800 }}>{selectedCustomer.assigned_executive || 'NA'}</div>
+                </div>
+                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>Area</div>
+                  <div style={{ fontSize: '14px', fontWeight: 800 }}>{selectedCustomer.area || 'NA'}</div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '32px', padding: '24px', background: 'rgba(197,160,89,0.03)', borderRadius: '20px', border: '1px solid rgba(197,160,89,0.1)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <ShieldCheck size={16} className="gold-text" />
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Guarantor Details</div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '16px', fontWeight: 800, marginBottom: '2px' }}>{selectedCustomer.guarantor || 'NA'}</div>
+                    <div style={{ fontSize: '11px', opacity: 0.6 }}>{selectedCustomer.guarantor_phone || 'No Phone'}</div>
+                  </div>
+                  {selectedCustomer.guarantor_phone && (
+                    <button 
+                      onClick={() => window.location.href = `tel:${selectedCustomer.guarantor_phone}`}
+                      style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border)' }}
+                    >
+                      <Phone size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
+                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>EMI Due Count</div>
+                  <div style={{ fontSize: '16px', fontWeight: 900 }}>{parseFloat(selectedCustomer.emi_due_count || 0).toFixed(2)}</div>
+                </div>
+                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>Last Received Date</div>
+                  <div style={{ fontSize: '16px', fontWeight: 900 }}>{selectedCustomer.last_received || 'NA'}</div>
+                </div>
+              </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '32px' }}>
                  <button 
@@ -744,7 +802,8 @@ const quickRemarks = ['Promised', 'Busy', 'Switch Off', 'Wrong No'];
 function DesktopView(props) {
   const { 
     isAdmin, profile, formattedDate, loading, fetchData, supabase,
-    totalMonthlyTBC, totalPoolOS, performanceScore, totalAssigned, paidCount, pendingCount,
+    totalMonthlyTBC, totalPoolOS, performanceScore, totalAssigned, paidCount, pendingCount, totalPoints,
+    sumMonthTBC, sumMonthCollected,
     uniqueExecs, selectedExec, setSelectedExec, filter, setFilter,
     activeTab, setActiveTab, searchTerm, setSearchTerm, displayCustomers,
     setSelectedCustomer, setIsDetailOpen, fetchHistory, isDetailOpen, selectedCustomer,
@@ -833,7 +892,7 @@ function DesktopView(props) {
         <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {displayCustomers.map((customer) => {
-              const isDueToday = customer.installment_day === currentDayOfMonth;
+              const isDueToday = Number(customer.installment_day) === currentDayOfMonth;
               const isSelected = selectedCustomer?.id === customer.id;
               const isPaid = customer.is_paid || (parseFloat(customer.month_tbc) === 0);
 
@@ -852,17 +911,22 @@ function DesktopView(props) {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <div style={{ fontSize: '14px', fontWeight: 700 }}>{customer.name}</div>
-                    <div className="gold-text" style={{ fontSize: '14px', fontWeight: 900 }}>
-                      ₹{parseFloat(customer.month_tbc).toLocaleString('en-IN')}
+                    <div style={{ fontSize: '14px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>{customer.name}</div>
+                    <div style={{ textAlign: 'right' }}>
+                       <div className="gold-text" style={{ fontSize: '14px', fontWeight: 900 }}>
+                         ₹{parseFloat(customer.month_tbc).toLocaleString('en-IN')}
+                       </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.5, fontSize: '11px', fontWeight: 600 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.6, fontSize: '10px', fontWeight: 700 }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                        {isPaid ? <Check size={10} color="#30D158" /> : <Clock size={10} />}
                        {customer.loan_no}
                     </span>
-                    <span>DAY {customer.installment_day}</span>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                       {customer.paid_percentage > 0 && <span style={{ color: '#30D158' }}>{customer.paid_percentage}%</span>}
+                       <span>DAY {customer.installment_day}</span>
+                    </div>
                   </div>
                 </div>
               );
@@ -879,33 +943,49 @@ function DesktopView(props) {
       {/* MAIN CONTENT: Detail Workspace */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#000' }}>
         {/* Top Metric Bar */}
-        <div style={{ padding: '24px 48px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '60px', alignItems: 'center', background: 'var(--bg)' }}>
-          {isAdmin && (
-            <>
-              <div>
-                <div style={{ fontSize: '24px', fontWeight: 900 }} className="gold-text">₹{totalMonthlyTBC.toLocaleString('en-IN')}</div>
-                <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Target (Current View)</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '24px', fontWeight: 900 }}>₹{totalPoolOS.toLocaleString('en-IN')}</div>
-                <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Portfolio Balance</div>
-              </div>
-            </>
-          )}
-          <div style={{ flex: 1 }} />
+        <div style={{ padding: '20px 48px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg)' }}>
           <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {[
+                { label: 'TOTAL', value: totalAssigned, color: 'var(--text-dim)' },
+                { label: 'PAID', value: paidCount, color: '#30D158', bg: 'rgba(48,209,88,0.05)' },
+                { label: 'BALANCE', value: pendingCount, color: '#FF3B30', bg: 'rgba(255,59,48,0.05)' },
+                { label: 'POINT', value: totalPoints.toFixed(2), color: 'var(--primary)', bg: 'rgba(197,160,89,0.05)' },
+                { label: 'PERCENTAGE', value: performanceScore, color: '#000', bg: 'var(--primary)' }
+              ].map((item) => (
+                <div key={item.label} style={{ 
+                  minWidth: '110px', 
+                  padding: '12px 20px', 
+                  background: item.bg || 'rgba(255,255,255,0.03)', 
+                  borderRadius: '16px',
+                  border: item.bg ? 'none' : '1px solid var(--border)',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '9px', fontWeight: 800, color: item.color === '#000' ? '#000' : 'var(--text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>{item.label}</div>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: item.color }}>{item.value}{item.label === 'PERCENTAGE' ? '%' : ''}</div>
+                </div>
+              ))}
+            </div>
+            
+            {isAdmin && (
+              <div style={{ display: 'flex', gap: '24px', marginLeft: '24px', paddingLeft: '24px', borderLeft: '1px solid var(--border)' }}>
+                <div>
+                  <div style={{ fontSize: '18px', fontWeight: 900 }} className="gold-text">₹{totalMonthlyTBC.toLocaleString('en-IN')}</div>
+                  <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Target</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '18px', fontWeight: 900 }}>₹{totalPoolOS.toLocaleString('en-IN')}</div>
+                  <div style={{ fontSize: '9px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Portfolio</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '16px', fontWeight: 900, color: performanceScore >= 80 ? '#30D158' : performanceScore >= 50 ? 'var(--primary)' : '#FF3B30' }}>
+                <div style={{ fontSize: '14px', fontWeight: 900, color: performanceScore >= 80 ? '#30D158' : performanceScore >= 50 ? 'var(--primary)' : '#FF3B30' }}>
                   {performanceScore}% EFFICIENCY
                 </div>
-                <div style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 800, textTransform: 'uppercase' }}>Performance Score</div>
-             </div>
-             <div style={{ width: '120px', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${performanceScore}%` }}
-                  style={{ height: '100%', background: performanceScore >= 80 ? '#30D158' : 'var(--primary)' }} 
-                />
              </div>
              <button 
                 onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
@@ -976,13 +1056,48 @@ function DesktopView(props) {
                  <div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '40px' }}>
                        <div className="card" style={{ padding: '24px' }}>
-                          <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>Monthly Target</div>
-                          <div style={{ fontSize: '32px', fontWeight: 900 }} className="gold-text">₹{parseFloat(selectedCustomer.month_tbc).toLocaleString('en-IN')}</div>
+                          <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>Month TBC</div>
+                          <div style={{ fontSize: '32px', fontWeight: 900 }} className="gold-text">₹{parseFloat(selectedCustomer.month_tbc || 0).toLocaleString('en-IN')}</div>
                        </div>
                        <div className="card" style={{ padding: '24px' }}>
-                          <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>Total O/S</div>
-                          <div style={{ fontSize: '32px', fontWeight: 900 }}>₹{parseFloat(selectedCustomer.loan_amount).toLocaleString('en-IN')}</div>
+                          <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>Month Collected</div>
+                          <div style={{ fontSize: '32px', fontWeight: 900, color: '#30D158' }}>₹{parseFloat(selectedCustomer.month_collected || 0).toLocaleString('en-IN')}</div>
+                          {selectedCustomer.paid_percentage > 0 && (
+                            <div style={{ fontSize: '12px', fontWeight: 800, marginTop: '4px', opacity: 0.8 }}>{selectedCustomer.paid_percentage}% OF TOTAL</div>
+                          )}
                        </div>
+                       <div className="card" style={{ padding: '24px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>Point</div>
+                          <div style={{ fontSize: '32px', fontWeight: 900 }}>
+                            {parseFloat(selectedCustomer.points || 0).toFixed(1)}
+                          </div>
+                       </div>
+                       <div className="card" style={{ padding: '24px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>Principle</div>
+                          <div style={{ fontSize: '32px', fontWeight: 900, color: 'var(--primary)' }}>₹{parseFloat(selectedCustomer.principal || 0).toLocaleString('en-IN')}</div>
+                       </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '40px' }}>
+                        <div className="card" style={{ padding: '24px' }}>
+                           <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>Guarantor Info</div>
+                           <div style={{ fontSize: '20px', fontWeight: 900 }}>{selectedCustomer.guarantor || 'NA'}</div>
+                           <div style={{ fontSize: '14px', opacity: 0.6, marginTop: '4px' }}>{selectedCustomer.guarantor_phone || 'No Phone'}</div>
+                        </div>
+                        <div className="card" style={{ padding: '24px' }}>
+                           <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>Executive & Area</div>
+                           <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--primary)' }}>{selectedCustomer.assigned_executive || 'NA'}</div>
+                           <div style={{ fontSize: '12px', opacity: 0.5, marginTop: '4px' }}>Area: {selectedCustomer.area || 'NA'}</div>
+                        </div>
+                        <div className="card" style={{ padding: '24px' }}>
+                           <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>Status</div>
+                           <div style={{ fontSize: '20px', fontWeight: 900 }}>{selectedCustomer.status || 'ACTIVE'}</div>
+                        </div>
+                        <div className="card" style={{ padding: '24px' }}>
+                           <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-dim)', marginBottom: '12px', textTransform: 'uppercase' }}>EMI Due Count</div>
+                           <div style={{ fontSize: '20px', fontWeight: 900 }}>{parseFloat(selectedCustomer.emi_due_count || 0).toFixed(2)}</div>
+                           <div style={{ fontSize: '12px', opacity: 0.5, marginTop: '4px' }}>Last Rcv: {selectedCustomer.last_received || 'NA'}</div>
+                        </div>
                     </div>
 
                     <div style={{ marginBottom: '40px' }}>

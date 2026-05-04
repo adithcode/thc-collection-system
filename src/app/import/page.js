@@ -54,15 +54,24 @@ export default function ImportPage() {
   };
 
   const FIELD_DEFINITIONS = [
-    { key: "loan_no", label: "Loan No", required: true },
-    { key: "name", label: "Customer Name", required: true },
-    { key: "assigned_executive", label: "Executive (Agent)", required: true },
-    { key: "phone", label: "Mobile Number", required: true },
-    { key: "month_tbc", label: "Month TBC (EMI)", required: false },
-    { key: "due_date", label: "Last Due Date", required: true },
-    { key: "loan_amount", label: "Total Due", required: true },
-    { key: "installment_day", label: "Install Day (Date)", required: false },
+    { key: "loan_no", label: "Agreement No", required: true },
+    { key: "name", label: "Customer", required: true },
+    { key: "phone", label: "Cust Mobile", required: false },
+    { key: "guarantor", label: "Guarantor", required: false },
+    { key: "guarantor_phone", label: "Guar Mobile", required: false },
+    { key: "principal", label: "Finance Amt", required: false },
+    { key: "installment_day", label: "Inst. Date", required: false },
+    { key: "area", label: "Area", required: false },
+    { key: "assigned_executive", label: "Executive", required: false },
     { key: "status", label: "Status", required: false },
+    { key: "month_tbc", label: "Month TBC", required: false },
+    { key: "month_collected", label: "Month Collected", required: false },
+    { key: "points", label: "Point", required: false },
+    { key: "emi_due_count", label: "EMI Due Count", required: false },
+    { key: "last_received", label: "Last Rcv", required: false },
+    { key: "loan_amount", label: "Agreement Value", required: false },
+    { key: "total_paid", label: "Gross Collected", required: false },
+    { key: "paid_percentage", label: "Coll/Demand (%)", required: false },
   ];
 
   const handleFileUpload = (e) => {
@@ -98,11 +107,21 @@ export default function ImportPage() {
                    lowH === f.key.toLowerCase() ||
                     (f.key === 'loan_no' && lowH.includes('agreement')) ||
                     (f.key === 'name' && (lowH === 'customer' || lowH.includes('customer'))) ||
-                    (f.key === 'month_tbc' && (lowH === 'month' || lowH.includes('tbc') || lowH.includes('to be collected'))) ||
-                    (f.key === 'loan_amount' && (lowH.includes('total due') || lowH.includes('total dues') || lowH.includes('balance'))) ||
-                    (f.key === 'assigned_executive' && (lowH.includes('executive') || lowH.includes('agent'))) ||
-                    (f.key === 'phone' && (lowH.includes('phone') || lowH.includes('mobile') || lowH.includes('contact'))) ||
-                    (f.key === 'installment_day' && (lowH.includes('inst. date') || lowH.includes('installment date')));
+                    (f.key === 'month_tbc' && lowH === 'month tbc') ||
+                    (f.key === 'loan_amount' && (lowH === 'agreement value' || lowH === 'total dues')) ||
+                    (f.key === 'assigned_executive' && (lowH === 'executive' || lowH === 'agent')) ||
+                    (f.key === 'phone' && (lowH.includes('cust mobile') || lowH === 'phone')) ||
+                    (f.key === 'total_paid' && (lowH.includes('gross collected') || lowH.includes('total paid'))) ||
+                    (f.key === 'paid_percentage' && (lowH === 'coll/demand (%)' || lowH === 'percentage')) ||
+                    (f.key === 'points' && (lowH === 'point' || lowH === 'points')) ||
+                    (f.key === 'guarantor' && lowH.includes('guarantor')) ||
+                    (f.key === 'guarantor_phone' && (lowH.includes('guar mobile') || lowH.includes('guar mob'))) ||
+                    (f.key === 'area' && lowH === 'area') ||
+                    (f.key === 'principal' && (lowH.includes('finance amt') || lowH === 'principal')) ||
+                    (f.key === 'emi_due_count' && lowH.includes('emi due count')) ||
+                    (f.key === 'last_received' && (lowH.includes('last rcv') || lowH.includes('last receipt') || lowH.includes('last received'))) ||
+                    (f.key === 'month_collected' && (lowH === 'month collected' || lowH.includes('gross collected'))) ||
+                    (f.key === 'installment_day' && (lowH.includes('inst. date') || lowH === 'day'));
           });
           if (match) autoMap[f.key] = match;
         });
@@ -110,6 +129,11 @@ export default function ImportPage() {
         // Hard Fallback: If Month TBC isn't found, map it to the same column as Total Due
         if (!autoMap.month_tbc && autoMap.loan_amount) {
           autoMap.month_tbc = autoMap.loan_amount;
+        }
+
+        // Hard Fallback: If Month Collected isn't found, map it to Total Paid (Gross Collected)
+        if (!autoMap.month_collected && autoMap.total_paid) {
+          autoMap.month_collected = autoMap.total_paid;
         }
 
         setMapping(autoMap);
@@ -127,7 +151,20 @@ export default function ImportPage() {
       const headerIndex = headers.indexOf(mapping[f.key]);
       let val = row[headerIndex];
       
-      if (['loan_amount', 'month_tbc'].includes(f.key)) {
+      if (f.key === 'points') {
+        if (!val || parseFloat(val) === 0) {
+            const tbcIdx = headers.indexOf(mapping.month_tbc);
+            const collectedIdx = headers.indexOf(mapping.month_collected);
+            const tbcVal = parseFloat(row[tbcIdx]) || 0;
+            const collectedVal = parseFloat(row[collectedIdx]) || 0;
+            
+            if (tbcVal === 0 || !collectedVal) {
+                val = 0;
+            } else {
+                val = parseFloat((collectedVal / tbcVal).toFixed(1));
+            }
+        }
+      } else if (['loan_amount', 'month_tbc', 'total_paid', 'paid_percentage', 'principal', 'emi_due_count'].includes(f.key)) {
         if (val !== null && val !== undefined) {
           const strVal = val.toString().replace(/[^0-9.]/g, '');
           val = strVal ? Number(strVal) : 0;

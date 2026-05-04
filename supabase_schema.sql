@@ -14,7 +14,17 @@ CREATE TABLE customers (
   installment_day INTEGER,
   status TEXT DEFAULT 'Due',
   is_paid BOOLEAN DEFAULT false,
-  is_priority BOOLEAN DEFAULT false,
+  total_paid DECIMAL(12, 2) DEFAULT 0,
+  paid_percentage DECIMAL(5, 2) DEFAULT 0,
+  points DECIMAL(10, 2) DEFAULT 0,
+  guarantor TEXT,
+  guarantor_phone TEXT,
+  area TEXT,
+  principal DECIMAL(12, 2) DEFAULT 0,
+  emi_due_count DECIMAL(10, 2) DEFAULT 0,
+  last_received TEXT,
+  month_collected DECIMAL(12, 2) DEFAULT 0,
+  status TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
